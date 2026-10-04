@@ -269,7 +269,7 @@ V.home = function () {
   var mcats = CATS.filter(function (c) { return c.mobileHome !== false; });
   var m = statusbar() +
     '<header class="sh"><a href="#/" class="slot lg-t" style="width:auto;font-family:var(--serif);font-weight:700;font-size:18px;text-transform:uppercase;white-space:nowrap">' + esc(logo) + '</a>' + menuBtn() + '</header>' +
-    '<div class="v home"><section class="hero"><div class="bg">' + uimg('heroMobile', '', true) + '</div><div class="meta"><p class="k">' + esc(H.kicker || 'Sélection du moment') + '</p><h2>' + esc(H.title || S.name) + '</h2><p>' + esc(H.text || S.slogan) + '</p></div></section>' +
+    '<div class="v home">' + carousel('m') +
     '<nav class="cats" aria-label="Catégories">' + mcats.map(function (c) { return '<a href="' + clink(c) + '"><span class="iw">' + icon(c.icon || 'wine') + '</span>' + esc(c.label) + '</a>'; }).join('') + '</nav>' +
     '<section class="sec"><div class="sec-h"><h3>' + esc(T.picks) + '</h3><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="hscroll">' + feat.map(pcard).join('') + '</div></section>' +
     (lim.length ? '<section class="limited"><h3>' + esc(T.limited) + '</h3>' + lim.map(function (p) {
@@ -280,7 +280,7 @@ V.home = function () {
     '<div class="row">' + icon('time', 16) + '<div class="muted">' + hoursHtml() + '</div></div>' +
     '<div class="acts"><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="chip g" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'WhatsApp</a><a class="chip g" href="' + telLink() + '">' + icon('phone', 14) + 'Appeler</a></div></section></div>';
 
-  var d = '<section class="dhero"><div class="bg">' + uimg('heroDesktop', '', true) + '</div><div class="dw"><div class="hc"><h1>' + esc(H.titleDesktop || H.title || S.name) + '</h1><p>' + esc(H.textDesktop || H.text || S.slogan) + '</p><a class="dbtn o" href="#/catalogue">' + esc(H.cta || 'Découvrir la collection') + '</a></div></div></section>' +
+  var d = carousel('d') +
     '<section class="dw dsec"><h2 class="dh2">Explorez la Cave</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
     '<section class="dw dsec"><div class="dsh"><h2 class="dh2">' + esc(T.picks) + '</h2><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="dgrid g4">' + feat.slice(0, 4).map(function (p) { return dpcard(p); }).join('') + '</div></section>' +
     (lim.length ? '<section class="dlim"><div class="dw dsec"><h2 class="dh2">' + esc(T.limited) + '</h2><div class="row">' + lim.slice(0, 2).map(function (p) {
@@ -363,6 +363,92 @@ V.filtres = function () {
   dPanel = true;
   return { m: m, d: V.catalogue({}, {}).d, nav: 'cave', noNav: true, dnav: 'shop' };
 };
+
+
+/* =========================== carrousel d'accueil ===========================
+   hero.slides : [{image, imageMobile, eyebrow, title, subtitle, cta, link}] ; link = "#/..." ou "cat:<id>" */
+var SLIDES = ((H.slides && H.slides.length) ? H.slides : [{ image: IMG.heroDesktop, imageMobile: IMG.heroMobile, eyebrow: H.kicker, title: H.titleDesktop || H.title, subtitle: H.textDesktop || H.text, cta: H.cta, link: '#/catalogue' }]).filter(function (x) { return x && (x.image || x.imageMobile); });
+function slideLink(l) { if (l && l.indexOf('cat:') === 0) { var c = CAT[l.slice(4)]; return c ? clink(c) : '#/catalogue'; } return l || '#/catalogue'; }
+var CAR_MS = Math.max(4000, +(H.interval || 5500));
+var carIdx = 0, carPausedByUser = false;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function carousel(mode) {
+  var n = SLIDES.length, isD = mode === 'd';
+  var slides = SLIDES.map(function (sl, i) {
+    var dsk = sl.image || sl.imageMobile, mob = isD ? dsk : (sl.imageMobile || sl.image);
+    var on = i === carIdx, first = i === 0;
+    /* 1re image chargée tout de suite, les autres à la demande (data-src) */
+    var img = (on || first) ? '<img src="' + esc(mob) + '" alt="" ' + (first ? 'fetchpriority="high" ' : '') + 'decoding="async">' : '<img data-src="' + esc(mob) + '" alt="" decoding="async">';
+    var tag = first ? (isD ? 'h1' : 'h2') : (isD ? 'h2' : 'h3');
+    return '<article class="car-s' + (on ? ' is-on' : '') + '" role="group" aria-roledescription="diapositive" aria-label="' + (i + 1) + ' sur ' + n + '"' + (on ? '' : ' aria-hidden="true"') + ' data-i="' + i + '">' +
+      '<div class="car-bg">' + img + '</div>' +
+      '<div class="car-tx' + (isD ? ' dw' : '') + '"><div class="in">' + (sl.eyebrow ? '<p class="k">' + esc(sl.eyebrow) + '</p>' : '') + '<' + tag + ' class="t">' + esc(sl.title || '') + '</' + tag + '>' + (sl.subtitle ? '<p class="s">' + esc(sl.subtitle) + '</p>' : '') +
+      (sl.cta ? '<a class="' + (isD ? 'dbtn o' : 'btn btn-o') + ' car-cta" href="' + esc(slideLink(sl.link)) + '"' + (on ? '' : ' tabindex="-1"') + '>' + esc(sl.cta) + '</a>' : '') + '</div></div></article>';
+  }).join('');
+  var ind = n > 1 ? '<div class="car-ind" role="tablist" aria-label="Choisir une diapositive">' + SLIDES.map(function (sl, i) {
+    return '<button role="tab" data-car-go="' + i + '" aria-label="Diapositive ' + (i + 1) + ' : ' + esc(sl.title || '') + '" aria-selected="' + (i === carIdx) + '"' + (i === carIdx ? ' class="on"' : '') + '><i></i></button>';
+  }).join('') + '</div>' : '';
+  var ctl = n > 1 ? '<div class="car-ctl">' + ind + '<span class="car-num" aria-hidden="true"><b>' + ('0' + (carIdx + 1)).slice(-2) + '</b> / ' + ('0' + n).slice(-2) + '</span>' +
+    '<button class="car-pp" data-car-pp aria-label="' + (carPausedByUser || reduceMotion ? 'Lancer le défilement' : 'Mettre en pause le défilement') + '">' + (carPausedByUser || reduceMotion ? '▶' : '❚❚') + '</button>' +
+    (isD ? '<button class="car-ar" data-car-step="-1" aria-label="Diapositive précédente">' + icon('chev-left') + '</button><button class="car-ar" data-car-step="1" aria-label="Diapositive suivante">' + icon('chev-right') + '</button>' : '') + '</div>' : '';
+  return '<section class="car car-' + mode + (carPausedByUser || reduceMotion ? ' paused' : '') + '" data-car tabindex="0" aria-roledescription="carrousel" aria-label="À la une" style="--car-ms:' + CAR_MS + 'ms">' +
+    '<div class="car-vp" aria-live="' + (carPausedByUser || reduceMotion ? 'polite' : 'off') + '">' + slides + '</div>' + (isD ? '<div class="car-ctlw dw">' + ctl + '</div>' : ctl) + '</section>';
+}
+function carEls() { return [].slice.call(document.querySelectorAll('[data-car]')); }
+function carLoad(el, i) { var im = el.querySelector('.car-s[data-i="' + i + '"] img[data-src]'); if (im) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); } }
+function carShow(i) {
+  var n = SLIDES.length; if (n < 2) return;
+  carIdx = (i + n) % n;
+  carEls().forEach(function (el) {
+    carLoad(el, carIdx); carLoad(el, (carIdx + 1) % n);
+    el.querySelectorAll('.car-s').forEach(function (s2, k) {
+      var on = k === carIdx; s2.classList.toggle('is-on', on);
+      if (on) s2.removeAttribute('aria-hidden'); else s2.setAttribute('aria-hidden', 'true');
+      var a = s2.querySelector('.car-cta'); if (a) { if (on) a.removeAttribute('tabindex'); else a.setAttribute('tabindex', '-1'); }
+    });
+    el.querySelectorAll('[data-car-go]').forEach(function (b, k) {
+      var on = k === carIdx; b.setAttribute('aria-selected', on);
+      b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } /* relance la barre de progression */
+    });
+    var num = el.querySelector('.car-num b'); if (num) num.textContent = ('0' + (carIdx + 1)).slice(-2);
+  });
+}
+function carPauseState() {
+  carEls().forEach(function (el) {
+    var p = carPausedByUser || reduceMotion || el._hover || el._touch || el._focus || document.hidden;
+    el.classList.toggle('paused', !!p);
+    var vp = el.querySelector('.car-vp'); if (vp) vp.setAttribute('aria-live', carPausedByUser || reduceMotion ? 'polite' : 'off');
+    var pp = el.querySelector('[data-car-pp]'); if (pp) { var stopped = carPausedByUser || reduceMotion; pp.textContent = stopped ? '▶' : '❚❚'; pp.setAttribute('aria-label', stopped ? 'Lancer le défilement' : 'Mettre en pause le défilement'); }
+  });
+}
+function initCarousels() {
+  carEls().forEach(function (el) {
+    var n = SLIDES.length;
+    carLoad(el, (carIdx + 1) % n);
+    /* l'avance automatique suit la fin de l'animation de la barre active (donc se met en pause avec elle) */
+    el.addEventListener('animationend', function (e) { if (e.animationName === 'carfill' && el.offsetParent !== null && !el.classList.contains('paused')) carShow(carIdx + 1); });
+    el.addEventListener('mouseenter', function () { el._hover = true; carPauseState(); });
+    el.addEventListener('mouseleave', function () { el._hover = false; carPauseState(); });
+    el.addEventListener('focusin', function () { el._focus = true; carPauseState(); });
+    el.addEventListener('focusout', function () { el._focus = false; carPauseState(); });
+    var x0 = null, y0 = null;
+    el.addEventListener('touchstart', function (e) { var t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; el._touch = true; carPauseState(); }, { passive: true });
+    el.addEventListener('touchend', function (e) {
+      el._touch = false;
+      if (x0 != null) { var t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) carShow(carIdx + (dx < 0 ? 1 : -1)); }
+      x0 = null; carPauseState();
+    }, { passive: true });
+    el.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') { e.preventDefault(); carShow(carIdx + 1); } else if (e.key === 'ArrowLeft') { e.preventDefault(); carShow(carIdx - 1); } });
+    el.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-car-go],[data-car-step],[data-car-pp]'); if (!b) return;
+      if (b.hasAttribute('data-car-go')) carShow(+b.getAttribute('data-car-go'));
+      else if (b.hasAttribute('data-car-step')) carShow(carIdx + (+b.getAttribute('data-car-step')));
+      else { carPausedByUser = !carPausedByUser; carPauseState(); }
+    });
+  });
+  carPauseState();
+}
+document.addEventListener('visibilitychange', carPauseState);
 
 /* ---- Pages catégorie (#/categorie/<slug>) ---- */
 var catState = { slug: null, region: '', shown: 8 };
@@ -769,6 +855,7 @@ function render(keepScroll) {
   var key = location.hash.split('?')[0];
   if (keepScroll && key === lastKey) window.scrollTo(0, y); else window.scrollTo(0, 0);
   lastKey = key;
+  initCarousels();
 }
 
 /* ---------- vérification d'âge ---------- */
