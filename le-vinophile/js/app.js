@@ -60,6 +60,17 @@ var DELIV = (S.delivery && S.delivery.options) || [{ id: 'standard', label: 'Liv
 var FREE = (S.delivery && S.delivery.freeFrom) || 0;
 var PAYS = S.payments || [{ id: 'cod', label: 'Paiement à la livraison', desc: 'Espèces à la réception', type: 'cod', icon: 'cash' }];
 var CLUB = S.club || {};
+/* catégories : chaque catégorie a sa page #/categorie/<slug> ; les vins (group "vins") ont une page de regroupement #/vins */
+function slugify(x) { return norm(x).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+CATS.forEach(function (c) { c.slug = c.slug || slugify(c.labelLong || c.label || c.id); c.title = c.title || c.labelLong || c.label; });
+var CATSLUG = {}; CATS.forEach(function (c) { CATSLUG[c.slug] = c; });
+var WINE = CATS.filter(function (c) { return c.group === 'vins'; });
+var HUB = WINE.length > 1;
+var WP = Object.assign({ label: 'Vins', title: 'Nos vins', kicker: 'La cave', description: '' }, S.winesPage || {});
+function clink(c) { return '#/categorie/' + encodeURIComponent(c.slug); }
+function inCat(c) { return P.filter(function (p) { return p.category === c.id; }); }
+function refs(n) { return n + ' référence' + (n > 1 ? 's' : ''); }
+function giftLink() { return CAT.coffret ? clink(CAT.coffret) : '#/catalogue'; }
 var MEM = Object.assign({ name: 'Client Démo', email: 'client@exemple.bj', phone: S.phonePrefix || '+229', since: '2025', tier: 'Or', points: 2450, nextTier: 'Platine', nextAt: 3000, address: (S.neighbourhood || '') + ', ' + (S.city || '') }, CLUB.member || {});
 var PREFIX = S.phonePrefix || '+229';
 
@@ -158,27 +169,39 @@ function socials() {
   return out;
 }
 function drawer() {
-  var links = [['#/', 'Accueil'], ['#/catalogue', 'La Cave'], ['#/recherche', 'Rechercher'], ['#/favoris', "Ma liste d'envies"], ['#/journal', 'Le Journal'], ['#/club', CLUB.name || 'Club Privé'], ['#/suivi', 'Suivi de commande'], ['#/compte', 'Mon compte']];
+  var links = [['#/', 'Accueil'], ['#/catalogue', 'Boutique · tout le catalogue']];
+  var hubDone = false;
+  CATS.forEach(function (c) {
+    if (HUB && c.group === 'vins') { if (!hubDone) { hubDone = true; links.push(['#/vins', 'Tous nos ' + WP.label.toLowerCase(), 'sub']); WINE.forEach(function (w) { links.push([clink(w), w.title, 'sub2']); }); } }
+    else links.push([clink(c), c.title, 'sub']);
+  });
+  links = links.concat([['#/journal', 'Le Journal'], ['#/club', CLUB.name || 'Club Privé'], ['#/services', 'Livraison & paiement'], ['#/recherche', 'Rechercher'], ['#/favoris', "Ma liste d'envies"], ['#/suivi', 'Suivi de commande'], ['#/compte', 'Mon compte']]);
   return '<div class="drawer' + (drawerOpen ? ' open' : '') + '" id="drawer"><div class="ov" data-act="drawer-close"></div><aside class="pn" aria-label="Menu">' +
     '<div class="top"><b class="lg-t">' + esc(logo) + '</b><button data-act="drawer-close" aria-label="Fermer">' + icon('x20') + '</button></div>' +
-    '<nav>' + links.map(function (l) { return '<a href="' + l[0] + '">' + l[1] + icon('chev-right') + '</a>'; }).join('') + '</nav>' +
+    '<nav>' + links.map(function (l) { return '<a href="' + l[0] + '"' + (l[2] ? ' class="' + l[2] + '"' : '') + '>' + esc(l[1]) + icon('chev-right') + '</a>'; }).join('') + '</nav>' +
     '<div class="info"><div>' + icon('pin', 14, 'c-accent') + ' <b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br>' + esc(S.address) + '</div><div>' + hoursHtml() + '</div><div>' + esc(S.phone) + '</div></div>' +
     '<div class="visit" style="margin:0;padding:0;border:0;background:none"><div class="acts"><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="chip g" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'WhatsApp</a><a class="chip g" href="' + telLink() + '">' + icon('phone', 14) + 'Appeler</a></div></div>' +
     '<div class="soc">' + socials() + '</div></aside></div>';
 }
 function dHeader(active) {
   var n = cartCount();
-  var nav = [['shop', '#/catalogue', 'Boutique'], ['vins', '#/catalogue?group=vins', 'Vins'], ['champagne', '#/catalogue?cat=champagne', 'Champagnes'], ['spiritueux', '#/catalogue?cat=spiritueux', 'Spiritueux'], ['coffret', '#/catalogue?cat=coffret', 'Coffrets'], ['journal', '#/journal', 'Journal']];
+  var nav = [['shop', '#/catalogue', 'Boutique']], hubDone = false;
+  CATS.forEach(function (c) {
+    if (HUB && c.group === 'vins') { if (!hubDone) { hubDone = true; nav.push(['vins', '#/vins', WP.label, WINE]); } }
+    else nav.push([c.id, clink(c), c.navLabel || c.label]);
+  });
+  nav.push(['journal', '#/journal', 'Journal'], ['club', '#/club', 'Club']);
   return '<header class="dh d-only"><div class="dw"><a class="logo lg-t" href="#/">' + esc(logo) + '</a><nav>' + nav.map(function (l) {
-    return '<a href="' + l[1] + '" class="' + (active === l[0] ? 'on' : '') + '">' + l[2] + '</a>';
+    var a = '<a href="' + l[1] + '" class="' + (active === l[0] ? 'on' : '') + '">' + esc(l[2]) + (l[3] ? icon('chev-down10') : '') + '</a>';
+    return l[3] ? '<div class="dd">' + a + '<div class="ddm"><div>' + l[3].map(function (w) { return '<a href="' + clink(w) + '">' + esc(w.title) + '<small>' + refs(inCat(w).length) + '</small></a>'; }).join('') + '<a href="#/vins" class="all">Tous nos ' + esc(WP.label.toLowerCase()) + ' →</a></div></div></div>' : a;
   }).join('') + '</nav><div class="ra"><a href="#/recherche" aria-label="Rechercher">' + icon('search') + '</a><a href="#/favoris" aria-label="Favoris">' + icon('heart20') + '</a><a href="#/panier" aria-label="Panier">' + icon('bag', 20) + (n ? '<span class="badge">' + n + '</span>' : '') + '</a><a href="#/compte" aria-label="Mon compte">' + icon('user') + '</a></div></div></header>';
 }
 function dFooter() {
-  var catLinks = CATS.slice(0, 5).map(function (c) { return '<a href="#/catalogue?cat=' + c.id + '">' + esc(c.labelLong || c.label) + '</a>'; }).join('');
+  var catLinks = '<a href="#/catalogue">Tout le catalogue</a>' + (HUB ? '<a href="#/vins">Tous nos ' + esc(WP.label.toLowerCase()) + '</a>' : '') + CATS.map(function (c) { return '<a href="' + clink(c) + '">' + esc(c.title) + '</a>'; }).join('');
   return '<footer class="df d-only"><div class="dw"><div class="cols">' +
     '<div class="c1"><p class="lg lg-t">' + esc(logo) + '</p><p>' + esc(S.about || S.slogan) + '</p><div class="soc">' + socials() + '</div></div>' +
     '<div class="col"><h4>Boutique</h4><div>' + catLinks + '</div></div>' +
-    '<div class="col"><h4>Services</h4><div><a href="#/club">' + esc(CLUB.name || 'Club Privé') + '</a><a href="#/catalogue?cat=coffret">Coffrets cadeaux</a><a href="#/journal">Le Journal</a><a href="#/suivi">Suivi de livraison</a></div></div>' +
+    '<div class="col"><h4>Services</h4><div><a href="#/club">' + esc(CLUB.name || 'Club Privé') + '</a><a href="#/services">Livraison & paiement</a><a href="#/journal">Le Journal</a><a href="#/suivi">Suivi de commande</a></div></div>' +
     '<div class="col"><h4>Aide</h4><div><a href="#/compte">Mon compte</a><a href="#/favoris">Mes favoris</a><a href="#/panier">Mon panier</a><a href="' + waLink('Bonjour, j\'ai une question.') + '" target="_blank" rel="noopener">Nous écrire</a></div></div>' +
     '<div class="col info"><h4>Nous trouver</h4><div><span>' + esc(S.address) + '<br>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</span><span>' + hoursHtml() + '</span><a href="' + telLink() + '">' + esc(S.phone) + '</a><a href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener" class="gold">Itinéraire Google Maps →</a></div></div>' +
     '</div><div class="bot"><p>© ' + new Date().getFullYear() + ' ' + esc(S.name) + ". L'abus d'alcool est dangereux pour la santé, à consommer avec modération. Vente interdite aux mineurs.</p><p>" + esc(S.neighbourhood) + ' · ' + esc(S.city) + ' · ' + esc(S.country || 'Bénin') + '</p></div></div></footer>';
@@ -217,6 +240,9 @@ function filtered(opt) {
     if (!opt.noQ && !matchQ(p, F.q)) return false;
     return true;
   });
+  return sortList(r);
+}
+function sortList(r) {
   var s = F.sort;
   r.sort(function (a, b2) {
     if (s === 'asc') return a.price - b2.price;
@@ -244,7 +270,7 @@ V.home = function () {
   var m = statusbar() +
     '<header class="sh"><a href="#/" class="slot lg-t" style="width:auto;font-family:var(--serif);font-weight:700;font-size:18px;text-transform:uppercase;white-space:nowrap">' + esc(logo) + '</a>' + menuBtn() + '</header>' +
     '<div class="v home"><section class="hero"><div class="bg">' + uimg('heroMobile', '', true) + '</div><div class="meta"><p class="k">' + esc(H.kicker || 'Sélection du moment') + '</p><h2>' + esc(H.title || S.name) + '</h2><p>' + esc(H.text || S.slogan) + '</p></div></section>' +
-    '<nav class="cats" aria-label="Catégories">' + mcats.map(function (c) { return '<a href="#/catalogue?cat=' + c.id + '"><span class="iw">' + icon(c.icon || 'wine') + '</span>' + esc(c.label) + '</a>'; }).join('') + '</nav>' +
+    '<nav class="cats" aria-label="Catégories">' + mcats.map(function (c) { return '<a href="' + clink(c) + '"><span class="iw">' + icon(c.icon || 'wine') + '</span>' + esc(c.label) + '</a>'; }).join('') + '</nav>' +
     '<section class="sec"><div class="sec-h"><h3>' + esc(T.picks) + '</h3><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="hscroll">' + feat.map(pcard).join('') + '</div></section>' +
     (lim.length ? '<section class="limited"><h3>' + esc(T.limited) + '</h3>' + lim.map(function (p) {
       return '<a class="banner" href="' + plink(p) + '">' + imgTag(p.limited.banner || p.image, p.name) + '<p class="t">' + esc(p.name) + '</p><p class="s">' + esc(p.limited.desc || p.sub) + '</p><div class="r"><b>' + fmt(p.price) + '</b><span>/ ' + esc(p.limited.note || '') + '</span></div></a>';
@@ -255,12 +281,12 @@ V.home = function () {
     '<div class="acts"><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="chip g" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'WhatsApp</a><a class="chip g" href="' + telLink() + '">' + icon('phone', 14) + 'Appeler</a></div></section></div>';
 
   var d = '<section class="dhero"><div class="bg">' + uimg('heroDesktop', '', true) + '</div><div class="dw"><div class="hc"><h1>' + esc(H.titleDesktop || H.title || S.name) + '</h1><p>' + esc(H.textDesktop || H.text || S.slogan) + '</p><a class="dbtn o" href="#/catalogue">' + esc(H.cta || 'Découvrir la collection') + '</a></div></div></section>' +
-    '<section class="dw dsec"><h2 class="dh2">Explorez la Cave</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="#/catalogue?cat=' + c.id + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
+    '<section class="dw dsec"><h2 class="dh2">Explorez la Cave</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
     '<section class="dw dsec"><div class="dsh"><h2 class="dh2">' + esc(T.picks) + '</h2><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="dgrid g4">' + feat.slice(0, 4).map(function (p) { return dpcard(p); }).join('') + '</div></section>' +
     (lim.length ? '<section class="dlim"><div class="dw dsec"><h2 class="dh2">' + esc(T.limited) + '</h2><div class="row">' + lim.slice(0, 2).map(function (p) {
       return '<a class="pban" href="' + plink(p) + '">' + imgTag(p.limited.bannerWide || p.limited.banner || p.image, p.name) + '<p class="t">' + esc(p.name) + '</p><p class="s">' + esc(p.limited.desc || p.sub) + '</p><p class="p">' + fmt(p.price) + ' / ' + esc(p.limited.note || '') + '</p></a>';
     }).join('') + '</div></div></section>' : '') +
-    '<section class="dgift"><div class="dw"><div class="gi">' + uimg('giftBanner', 'Coffret cadeau') + '</div><div class="gc"><h2>' + esc(T.giftTitle) + '</h2><p>' + esc(T.giftText) + '</p><a class="dbtn f" href="#/catalogue?cat=coffret">' + esc(T.giftCta) + '</a></div></div></section>' +
+    '<section class="dgift"><div class="dw"><div class="gi">' + uimg('giftBanner', 'Coffret cadeau') + '</div><div class="gc"><h2>' + esc(T.giftTitle) + '</h2><p>' + esc(T.giftText) + '</p><a class="dbtn f" href="' + giftLink() + '">' + esc(T.giftCta) + '</a></div></div></section>' +
     '<section class="dvisit"><div class="dw"><div class="vi dcard"><h2>Nous trouver</h2>' +
     '<div class="row">' + icon('pin', 18) + '<div><b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br>' + esc(S.address) + '</div></div>' +
     '<div class="row">' + icon('time', 18) + '<div>' + hoursHtml() + '</div></div>' +
@@ -273,9 +299,10 @@ V.home = function () {
 
 /* ---- Catalogue ---- */
 function catFromQuery(q) {
-  if (q.cat && CAT[q.cat]) { F.cats = [q.cat]; persist(); }
-  else if (q.group) { F.cats = CATS.filter(function (c) { return c.group === q.group; }).map(function (c) { return c.id; }); persist(); }
-  if (q.q != null) { F.q = q.q; persist(); }
+  if (q.f) return; /* retour depuis l'écran Filtres : on garde les filtres */
+  resetFilters(); F.q = ''; shown = 6; /* "Boutique" = tout le catalogue */
+  if (q.q != null) F.q = q.q;
+  persist();
 }
 function catTitle() {
   if (F.cats.length === 1) return CAT[F.cats[0]].labelLong || CAT[F.cats[0]].label;
@@ -285,7 +312,9 @@ function catTitle() {
 function mGrid(list) { return list.length ? '<div class="grid2" id="mgrid">' + list.map(pcard).join('') + '</div>' : '<div class="empty" id="mgrid"><h3>Aucun flacon trouvé</h3><p>Essayez une autre recherche ou réinitialisez les filtres.</p><button class="btn btn-o" style="width:auto" data-act="reset">Réinitialiser</button></div>'; }
 var appliedHash = null;
 V.catalogue = function (args, q) {
-  if (location.hash !== appliedHash) { appliedHash = location.hash; catFromQuery(q); }
+  if (q.cat && CAT[q.cat]) { location.replace(clink(CAT[q.cat])); return { m: '', d: '' }; }
+  if (q.group === 'vins' && HUB) { location.replace('#/vins'); return { m: '', d: '' }; }
+  if (location.hash !== appliedHash && parse().key === 'catalogue') { appliedHash = location.hash; catFromQuery(q); }
   var list = filtered(), ac = activeCount();
   var chips = [['Type', F.cats.length], ['Région', F.regions.length], ['Millésime', F.years.length], ['Prix', F.min != null || F.max != null]];
   var m = statusbar() + mh(T.catalogueTitle, null) +
@@ -306,7 +335,7 @@ V.catalogue = function (args, q) {
     '<section class="dpanel' + (dPanel ? ' open' : '') + '"><div class="dw">' + filterGroups('d') + '</div></section>' +
     '<section class="dprod"><div class="dw">' + (page.length ? '<div class="dgrid g3">' + page.map(function (p) { return dpcard(p); }).join('') + '</div>' : '<div class="empty"><h3>Aucun flacon trouvé</h3><button class="dbtn g" data-act="reset">Réinitialiser les filtres</button></div>') +
     '<div class="dpag">' + (list.length > shown ? '<button class="dbtn g" data-act="more">Afficher ' + Math.min(6, list.length - shown) + ' autres flacons</button>' : '') + '<small>Affichage de ' + page.length + ' sur ' + list.length + ' flacons</small></div></div></section>';
-  return { m: m, d: d, nav: 'cave', dnav: F.cats.length === 1 ? F.cats[0] : (F.cats.length > 1 ? 'vins' : 'shop') };
+  return { m: m, d: d, nav: 'cave', dnav: 'shop' };
 };
 function filterGroups(mode) {
   var b = priceBounds();
@@ -328,11 +357,91 @@ function filterGroups(mode) {
 }
 V.filtres = function () {
   var n = filtered().length;
-  var m = statusbar() + mh('Filtres', '<a class="slot" href="#/catalogue" aria-label="Fermer">' + icon('x20') + '</a>', '') +
+  var m = statusbar() + mh('Filtres', '<a class="slot" href="#/catalogue?f=1" aria-label="Fermer">' + icon('x20') + '</a>', '') +
     '<div class="v flt">' + filterGroups('m') + '</div>' +
-    '<div class="ffoot"><div class="in"><button class="u" data-act="reset">Réinitialiser</button><a class="btn btn-f" href="#/catalogue" id="fcount">Voir ' + n + ' résultat' + (n > 1 ? 's' : '') + '</a></div></div>';
+    '<div class="ffoot"><div class="in"><button class="u" data-act="reset">Réinitialiser</button><a class="btn btn-f" href="#/catalogue?f=1" id="fcount">Voir ' + n + ' résultat' + (n > 1 ? 's' : '') + '</a></div></div>';
   dPanel = true;
   return { m: m, d: V.catalogue({}, {}).d, nav: 'cave', noNav: true, dnav: 'shop' };
+};
+
+/* ---- Pages catégorie (#/categorie/<slug>) ---- */
+var catState = { slug: null, region: '', shown: 8 };
+function sortSelect() { return '<label class="sort"><span>Trier par :</span><select data-in="sort" aria-label="Trier">' + SORTS.map(function (s) { return '<option value="' + s[0] + '"' + (F.sort === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select>' + icon('chev-down10') + '</label>'; }
+function catHeroM(img, kicker, title, desc, count) {
+  return '<section class="chero"><div class="bg">' + (img && img !== 'svg' ? imgTag(img, title, true) : '') + '</div><div class="meta"><p class="k">' + esc(kicker) + '</p><h2>' + esc(title) + '</h2>' + (desc ? '<p>' + esc(desc) + '</p>' : '') + '<span class="cn">' + esc(count) + '</span></div></section>';
+}
+function catHeroD(crumbs, img, kicker, title, desc, count, cta) {
+  return '<nav class="dbc"><div class="dw">' + crumbs + '</div></nav><section class="dcath"><div class="dw"><div class="tx"><p class="k">' + esc(kicker) + '</p><h1>' + esc(title) + '</h1>' + (desc ? '<p>' + esc(desc) + '</p>' : '') +
+    '<div class="mt"><span class="cn">' + esc(count) + '</span>' + (cta || '') + '</div></div><div class="im">' + (img && img !== 'svg' ? imgTag(img, title, true) : '') + '</div></div></section>';
+}
+function otherCats(cur, mode) {
+  var o = CATS.filter(function (c) { return c !== cur; });
+  if (mode === 'm') return '<section class="sec ocats"><div class="sec-h"><h3>Autres catégories</h3><a href="#/catalogue">Tout voir</a></div><div class="ocl">' + o.map(function (c) { return '<a href="' + clink(c) + '"><span class="iw">' + icon(c.icon || 'wine') + '</span><b>' + esc(c.title) + '</b><small>' + refs(inCat(c).length) + '</small></a>'; }).join('') + '</div></section>';
+  return '<section class="dw dsec docats"><div class="dsh"><h2 class="dh2">Autres catégories</h2><a href="#/catalogue">Toute la boutique</a></div><div class="dgrid g' + Math.min(6, Math.max(3, o.length)) + '">' + o.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.title) + '<small>' + refs(inCat(c).length) + '</small></a>'; }).join('') + '</div></section>';
+}
+V.categorie = function (args) {
+  var c = CATSLUG[decodeURIComponent(args[0] || '')] || CAT[decodeURIComponent(args[0] || '')];
+  if (!c) return V.notfound();
+  if (catState.slug !== c.slug) catState = { slug: c.slug, region: '', shown: 8 };
+  var all = inCat(c), rc = {};
+  all.forEach(function (p) { if (p.region) rc[p.region] = (rc[p.region] || 0) + 1; });
+  var regs = Object.keys(rc).sort(function (a, b) { return rc[b] - rc[a] || a.localeCompare(b); });
+  if (catState.region && !rc[catState.region]) catState.region = '';
+  var list = sortList(all.filter(function (p) { return !catState.region || p.region === catState.region; }));
+  var wine = HUB && c.group === 'vins';
+  var kicker = c.kicker || (wine ? WP.title : 'La cave');
+  var chips = regs.length > 1 ? [['', 'Toutes (' + all.length + ')']].concat(regs.map(function (r) { return [r, r + ' (' + rc[r] + ')']; })) : [];
+  var sibs = wine ? WINE.filter(function (w) { return w !== c; }) : [];
+  var chipHtml = function (cls) { return chips.map(function (x) { return '<button class="' + cls + (catState.region === x[0] ? ' on' : '') + '" data-act="creg" data-v="' + esc(x[0]) + '">' + esc(x[1]) + '</button>'; }).join(''); };
+  var sibHtml = function (cls) { return sibs.map(function (w) { return '<a class="' + cls + '" href="' + clink(w) + '">' + esc(w.title) + ' →</a>'; }).join(''); };
+  var m = statusbar() + mh(c.title, back(wine ? '#/vins' : '#/catalogue')) +
+    '<div class="v catp">' + catHeroM(c.image, kicker, c.title, c.description, refs(all.length)) +
+    (chips.length ? '<div class="fchips">' + chipHtml('chip') + '</div>' : '') +
+    (sibs.length ? '<div class="sibs">' + sibHtml('chip g') + '</div>' : '') +
+    '<div class="sortrow"><span class="cnt">' + refs(list.length) + (catState.region ? ' · ' + esc(catState.region) : '') + '</span><button data-act="sort">Trier par : ' + esc(sortLabel()) + icon('chev-down12') + '</button></div>' +
+    mGrid(list) + otherCats(c, 'm') + '</div>';
+  var crumbs = '<a href="#/catalogue">Boutique</a><span>/</span>' + (wine ? '<a href="#/vins">' + esc(WP.title) + '</a><span>/</span>' : '') + '<b>' + esc(c.title) + '</b>';
+  var page = list.slice(0, catState.shown);
+  var d = catHeroD(crumbs, c.image, kicker, c.title, c.description, refs(all.length), sibs.length ? '<span class="sib">' + sibHtml('lk') + '</span>' : '') +
+    '<section class="dfbar"><div class="dw"><div class="l"><div class="pills">' + (chips.length ? chipHtml('fchip sm') : '<span class="muted">' + refs(all.length) + '</span>') + '</div></div>' + sortSelect() + '</div></section>' +
+    '<section class="dprod"><div class="dw">' + (page.length ? '<div class="dgrid g4">' + page.map(function (p) { return dpcard(p); }).join('') + '</div>' : '<div class="empty"><h3>Aucun flacon dans cette catégorie</h3></div>') +
+    '<div class="dpag">' + (list.length > catState.shown ? '<button class="dbtn g" data-act="cmore">Afficher ' + Math.min(8, list.length - catState.shown) + ' autres flacons</button>' : '') + '<small>Affichage de ' + page.length + ' sur ' + list.length + ' flacons</small></div></div></section>' +
+    otherCats(c, 'd');
+  return { m: m, d: d, nav: 'cave', dnav: wine ? 'vins' : c.id, title: c.title };
+};
+
+/* ---- Page Vins : regroupe uniquement les sous-catégories de vins ---- */
+V.vins = function () {
+  if (!HUB) { location.replace(WINE[0] ? clink(WINE[0]) : '#/catalogue'); return { m: '', d: '' }; }
+  var wines = P.filter(function (p) { return CAT[p.category] && CAT[p.category].group === 'vins'; });
+  var picks = wines.filter(function (p) { return p.featured; }).concat(wines.filter(function (p) { return !p.featured; })).slice(0, 4);
+  var m = statusbar() + mh(WP.title, back('#/catalogue')) +
+    '<div class="v catp">' + catHeroM(WP.image, WP.kicker, WP.title, WP.description, refs(wines.length) + ' · ' + WINE.length + ' couleurs') +
+    '<section class="wtiles">' + WINE.map(function (w) { var n = inCat(w).length; return '<a class="wt" href="' + clink(w) + '"><div class="im">' + (w.image && w.image !== 'svg' ? imgTag(w.image, w.title) : '') + '</div><div class="tx"><b>' + esc(w.title) + '</b><p>' + esc(w.description || '') + '</p><small>' + refs(n) + '</small></div>' + icon('chev-right') + '</a>'; }).join('') + '</section>' +
+    '<section class="sec"><div class="sec-h"><h3>Sélection de vins</h3><a href="#/catalogue">Toute la boutique</a></div><div class="hscroll">' + picks.map(pcard).join('') + '</div></section></div>';
+  var d = catHeroD('<a href="#/catalogue">Boutique</a><span>/</span><b>' + esc(WP.title) + '</b>', WP.image, WP.kicker, WP.title, WP.description, refs(wines.length) + ' · ' + WINE.length + ' couleurs', '') +
+    '<section class="dw dsec"><h2 class="dh2">Choisissez votre couleur</h2><div class="dgrid g' + Math.min(4, WINE.length) + '">' + WINE.map(function (w) { var n = inCat(w).length; return '<a class="dwt" href="' + clink(w) + '"><div class="im">' + (w.image && w.image !== 'svg' ? imgTag(w.image, w.title) : '') + '</div><div class="tx"><h3>' + esc(w.title) + '</h3><p>' + esc(w.description || '') + '</p><span>' + refs(n) + ' · Découvrir →</span></div></a>'; }).join('') + '</div></section>' +
+    '<section class="dw dsec"><div class="dsh"><h2 class="dh2">Sélection de vins</h2><a href="#/catalogue">Toute la boutique</a></div><div class="dgrid g4">' + picks.map(function (p) { return dpcard(p); }).join('') + '</div></section>';
+  return { m: m, d: d, nav: 'cave', dnav: 'vins', title: WP.title };
+};
+
+/* ---- Services : livraison, retrait, paiement, cadeaux ---- */
+V.services = function () {
+  var del = S.delivery || {}, zones = del.zones || [];
+  var opts = DELIV.map(function (o) { return '<div class="svo"><div><b>' + esc(o.label) + '</b><p>' + esc(o.desc || '') + '</p><small>' + esc(o.eta || '') + '</small></div><span class="gold">' + (o.price ? fmt(o.price) : 'Gratuit') + '</span></div>'; }).join('');
+  var pays = PAYS.map(function (p) { return '<div class="svp">' + icon(p.icon || 'phone22', 18) + '<div><b>' + esc(p.label) + '</b><p>' + esc(p.desc || '') + '</p></div></div>'; }).join('');
+  var blocks = [
+    ['Livraison & retrait', (FREE ? '<p class="muted">Livraison offerte dès ' + fmt(FREE) + ' d\'achat.</p>' : '') + opts],
+    ['Quartiers desservis', '<div class="tags">' + zones.map(function (z) { return '<span class="chip g">' + esc(z) + '</span>'; }).join('') + '</div>'],
+    ['Paiement', pays],
+    ['Commande par WhatsApp', '<p class="muted">Composez votre panier puis envoyez-le en un clic : nous confirmons la disponibilité, le total et l\'heure de livraison sur WhatsApp.</p><a class="chip g" href="' + waLink('Bonjour ' + S.name + ', je souhaite passer commande.') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'Écrire à la cave</a>'],
+    ['Cadeaux', '<p class="muted">Option « Ceci est un cadeau » au moment de la commande : message manuscrit offert et emballage soigné.</p>' + (CAT.coffret ? '<a class="chip g" href="' + clink(CAT.coffret) + '">' + icon('gift', 14) + 'Voir les ' + esc(CAT.coffret.title.toLowerCase()) + '</a>' : '')],
+    ['Retrait à la cave', '<p><b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br><span class="muted">' + esc(S.address) + '</span></p><p class="muted">' + hoursHtml() + '</p><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a>']
+  ];
+  var m = statusbar() + mh('Livraison & paiement', back('#/')) + '<div class="v svc">' + blocks.map(function (b) { return '<section class="card svb"><h3>' + esc(b[0]) + '</h3>' + b[1] + '</section>'; }).join('') + '</div>';
+  var d = '<section class="dintro"><div class="dw"><h1>Livraison & paiement</h1><p>Comment commander chez ' + esc(S.name) + ' : livraison dans Cotonou, retrait à la cave, Mobile Money ou paiement à la livraison.</p></div></section>' +
+    '<section class="dw dsvc">' + blocks.map(function (b) { return '<div class="dcard svb"><h3>' + esc(b[0]) + '</h3>' + b[1] + '</div>'; }).join('') + '</section>';
+  return { m: m, d: d, nav: 'home', dnav: '', title: 'Livraison & paiement' };
 };
 
 /* ---- Recherche ---- */
@@ -387,7 +496,7 @@ V.produit = function (args) {
   var gal = (p.gallery && p.gallery.length ? p.gallery : [p.image, p.imageWide].concat(reco.map(function (x) { return x.image; }))).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).slice(0, 4);
   if (galIdx >= gal.length) galIdx = 0;
   var gimg = function (src, eager) { return src === 'svg' ? bottleSvg(p) : imgTag(src, p.name, eager); };
-  var d = '<nav class="dbc"><div class="dw"><a href="#/catalogue">Boutique</a><span>/</span><a href="#/catalogue?cat=' + p.category + '">' + esc(c.labelLong || c.label) + '</a><span>/</span><b>' + esc(p.name) + '</b></div></nav>' +
+  var d = '<nav class="dbc"><div class="dw"><a href="#/catalogue">Boutique</a><span>/</span><a href="' + (c.slug ? clink(c) : '#/catalogue') + '">' + esc(c.title || c.labelLong || c.label || 'Catalogue') + '</a><span>/</span><b>' + esc(p.name) + '</b></div></nav>' +
     '<section class="dmain"><div class="dw"><div class="dgal"><div class="mi">' + (gal.length ? gimg(gal[galIdx], true) : bottleSvg(p)) + '</div>' + (gal.length > 1 ? '<div class="ths">' + gal.map(function (g, i) { return '<button class="' + (i === galIdx ? 'on' : '') + '" data-act="gal" data-i="' + i + '" aria-label="Image ' + (i + 1) + '">' + gimg(g) + '</button>'; }).join('') + '</div>' : '') + '</div>' +
     '<div class="dbuy"><div class="mt"><p class="k">' + esc(p.tier || c.labelLong) + '</p><h1>' + esc(p.name) + '</h1><p class="ap">' + esc(p.sub) + '</p></div>' +
     '<div class="pr"><b>' + fmt(p.price) + '</b><span>' + (p.lowStock ? '<span style="color:var(--warning)">Plus que quelques bouteilles</span>' : 'Disponible immédiatement en cave') + '</span></div>' +
@@ -642,7 +751,7 @@ V.notfound = function () {
 };
 
 /* =========================== routeur & rendu =========================== */
-var ROUTES = { '': 'home', catalogue: 'catalogue', filtres: 'filtres', recherche: 'recherche', produit: 'produit', favoris: 'favoris', panier: 'panier', commande: 'commande', paiement: 'paiement', confirmation: 'confirmation', suivi: 'suivi', compte: 'compte', club: 'club', journal: 'journal' };
+var ROUTES = { '': 'home', catalogue: 'catalogue', categorie: 'categorie', vins: 'vins', services: 'services', filtres: 'filtres', recherche: 'recherche', produit: 'produit', favoris: 'favoris', panier: 'panier', commande: 'commande', paiement: 'paiement', confirmation: 'confirmation', suivi: 'suivi', compte: 'compte', club: 'club', journal: 'journal' };
 function parse() {
   var h = location.hash.replace(/^#\/?/, ''), qi = h.indexOf('?'), q = {};
   if (qi >= 0) { h.slice(qi + 1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || '').replace(/\+/g, ' ')); }); h = h.slice(0, qi); }
@@ -709,6 +818,8 @@ document.addEventListener('click', function (e) {
     case 'prange': { var pa = el.getAttribute('data-a'), pb = el.getAttribute('data-b'); var na = pa === '' ? null : +pa, nb = pb === '' ? null : +pb; if (F.min === na && F.max === nb) { F.min = null; F.max = null; } else { F.min = na; F.max = nb; } persist(); rerender(); return; }
     case 'dpanel': dPanel = !dPanel; rerender(); return;
     case 'more': shown += 6; rerender(); return;
+    case 'creg': catState.region = el.getAttribute('data-v'); catState.shown = 8; rerender(); return;
+    case 'cmore': catState.shown += 8; rerender(); return;
     case 'q': F.q = el.getAttribute('data-v'); persist(); rerender(); return;
     case 'unrecent': recent.splice(+el.getAttribute('data-i'), 1); persist(); rerender(); return;
     case 'logout': e.preventDefault(); toast('Démo : la connexion client n\'est pas activée'); return;

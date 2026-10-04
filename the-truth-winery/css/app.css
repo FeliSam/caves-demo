@@ -459,6 +459,49 @@ body.hide-bn .bn{display:none}
 .err404 h2{font-family:var(--serif);font-size:28px}
 .err404 p{color:var(--muted);line-height:1.6;max-width:680px}
 
+/* ---------- pages catégorie / vins / services (mobile) ---------- */
+.v.catp{gap:20px;padding-bottom:24px}
+.chero{position:relative;height:240px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 24px 20px;overflow:hidden;flex:none}
+.chero .bg{position:absolute;inset:0}
+.chero .bg img{width:100%;height:100%;object-fit:cover}
+.chero .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,var(--bg) 0%,color-mix(in srgb,var(--bg) 55%,transparent) 65%,color-mix(in srgb,var(--bg) 25%,transparent))}
+.chero .meta{position:relative;display:flex;flex-direction:column;gap:8px}
+.chero .k{font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.chero h2{font-family:var(--serif);font-size:30px;line-height:1.1}
+.chero p{color:var(--muted);font-size:13px;line-height:1.5}
+.chero .cn{align-self:flex-start;margin-top:2px;border:1px solid var(--accent);color:var(--accent);border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600}
+.catp .sibs{display:flex;gap:8px;padding:0 24px;flex-wrap:wrap}
+.catp .sibs .chip{color:var(--muted)}
+.ocats .ocl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 24px}
+.ocats .ocl a{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.ocats .ocl .iw{color:var(--accent);display:flex}
+.ocats .ocl b{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ocats .ocl small{color:var(--muted);font-size:11px}
+.wtiles{display:flex;flex-direction:column;gap:12px;padding:0 24px}
+.wt{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px 10px 10px;color:var(--text)}
+.wt .im{width:72px;height:88px;flex:none;border-radius:4px;overflow:hidden;background:#0e0e10}
+.wt .im img{width:100%;height:100%;object-fit:cover}
+.wt .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.wt .tx b{font-family:var(--serif);font-size:18px;font-weight:400}
+.wt .tx p{color:var(--muted);font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wt .tx small{color:var(--accent);font-size:11px;font-weight:600}
+.wt>.ic{color:var(--muted)}
+.v.svc{gap:16px;padding:8px 24px 24px}
+.svb{padding:18px;display:flex;flex-direction:column;gap:12px}
+.svb h3{font-family:var(--serif);font-size:19px;font-weight:400}
+.svb p{font-size:13px;line-height:1.5}
+.svb .chip{align-self:flex-start;color:var(--text)}
+.svo{display:flex;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid var(--border)}
+.svo b{font-weight:600;font-size:14px}
+.svo p{color:var(--muted);font-size:12px}
+.svo small{color:var(--faint);font-size:11px}
+.svo .gold{white-space:nowrap;font-weight:600;font-size:13px}
+.svp{display:flex;gap:12px;align-items:flex-start;color:var(--accent)}
+.svp b{color:var(--text);font-weight:600;font-size:14px}
+.svp p{color:var(--muted);font-size:12px}
+.drawer nav a.sub{padding-left:12px;font-size:14px}
+.drawer nav a.sub2{padding-left:26px;font-size:13px;color:var(--muted);padding-top:10px;padding-bottom:10px}
+
 /* ===================== DESKTOP (Figma 1440px frames, >=1024px) ===================== */
 @media (min-width:1024px){
   :root{--dpx:clamp(32px,5.56vw,80px)}
@@ -908,6 +951,49 @@ body.hide-bn .bn{display:none}
 .dsres{flex:1 1 0;min-width:0}
 .dreco{border-top:1px solid var(--border);padding-top:32px;display:flex;flex-direction:column;gap:32px}
 .dreco h2{font-size:30px}
+
+/* ---------- navigation : menu déroulant Vins ---------- */
+@media (min-width:1024px){
+  .dh nav{align-items:center}
+  .dh nav a{display:inline-flex;align-items:center;gap:6px}
+  .dh .dd{position:relative}
+  .dh .ddm{display:none;position:absolute;top:100%;left:-20px;padding-top:30px;z-index:40}
+  .dh .ddm>div{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;min-width:240px;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+  .dh .ddm a{display:flex;justify-content:space-between;gap:16px;padding:10px 12px;border-radius:4px;color:var(--text)}
+  .dh .ddm a:hover{background:var(--surface-2);color:var(--accent)}
+  .dh .ddm small{color:var(--muted);font-size:11px;font-weight:400}
+  .dh .ddm a.all{color:var(--accent);border-top:1px solid var(--border);border-radius:0;margin-top:4px}
+  .dh .dd:hover .ddm,.dh .dd:focus-within .ddm{display:block}
+
+  /* ---------- pages catégorie / vins / services ---------- */
+  .dcath .dw{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:24px;padding-bottom:48px}
+  .dcath .tx{display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+  .dcath .k{font-weight:600;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+  .dcath h1{font-family:var(--serif);font-size:52px;line-height:1.05;text-transform:uppercase}
+  .dcath p{font-size:16px;line-height:1.6;color:var(--muted);max-width:520px}
+  .dcath .mt{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .dcath .cn{border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:5px 14px;font-size:12px;font-weight:600;white-space:nowrap}
+  .dcath .sib{display:flex;gap:16px;flex-wrap:wrap}
+  .dcath .lk{font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:2px}
+  .dcath .lk:hover{color:var(--accent)}
+  .dcath .im{height:380px;border-radius:6px;overflow:hidden;background:#0e0e10;border:1px solid var(--border)}
+  .dcath .im img{width:100%;height:100%;object-fit:cover}
+  .dfbar .pills .fchip{cursor:pointer}
+  .dcat small{color:var(--muted);font-size:12px;font-weight:400}
+  .docats{padding-top:24px}
+  .dwt{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s}
+  .dwt:hover{border-color:var(--accent)}
+  .dwt .im{height:260px;background:#0e0e10}
+  .dwt .im img{width:100%;height:100%;object-fit:cover}
+  .dwt .tx{padding:24px;display:flex;flex-direction:column;gap:10px}
+  .dwt h3{font-family:var(--serif);font-size:26px;font-weight:400}
+  .dwt p{color:var(--muted);line-height:1.55;font-size:14px}
+  .dwt span{color:var(--accent);font-weight:600;font-size:13px}
+  .dsvc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding-bottom:64px}
+  .dsvc .svb{padding:28px}
+  .dsvc .svb h3{font-size:22px}
+}
+@media (min-width:1024px){.g5{grid-template-columns:repeat(5,minmax(0,1fr))}}
 
 /* --- thème de la cave --- */
 :root{--serif:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif}
