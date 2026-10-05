@@ -91,13 +91,121 @@ function pd(p, k) {
 }
 
 /* ---------- état (localStorage) ---------- */
+var currentTheme = (function () {
+  try { return localStorage.getItem('cave_theme') || 'dark'; } catch (e) { return 'dark'; }
+})();
+function setTheme(t) {
+  currentTheme = t;
+  try { localStorage.setItem('cave_theme', t); } catch (e) {}
+  document.documentElement.setAttribute('data-theme', t);
+  initInteractiveMap();
+  rerender();
+}
+function toggleTheme() {
+  setTheme(currentTheme === 'light' ? 'dark' : 'light');
+}
+
+/* Auth & RBAC (Rôles : 'superadmin', 'gerant', 'client') */
+var DEFAULT_USERS = [
+  {
+    id: 'usr-superadmin',
+    email: 'superadmin@caves.bj',
+    name: 'Direction Générale (SuperAdmin)',
+    role: 'superadmin',
+    phone: '+229 01 97 00 00 00',
+    caveSlug: 'all',
+    tier: 'Platine'
+  },
+  {
+    id: 'usr-gerant-aurelie',
+    email: 'gerant@sainte-aurelie.bj',
+    name: 'Gérance Sainte-Aurélie',
+    role: 'gerant',
+    phone: '+229 01 53 02 77 36',
+    caveSlug: 'cave-sainte-aurelie',
+    tier: 'Gérant'
+  },
+  {
+    id: 'usr-client',
+    email: 'client@cotonou.bj',
+    name: 'Patrice Bio',
+    role: 'client',
+    phone: '+229 01 95 12 34 56',
+    caveSlug: 'cave-sainte-aurelie',
+    tier: 'Or'
+  }
+];
+
+function getUsers() {
+  var u = load('all_users', null);
+  if (!u || !u.length) {
+    u = DEFAULT_USERS.slice();
+    save('all_users', u);
+  }
+  return u;
+}
+function saveUsers(u) { save('all_users', u); }
+function addUser(name, email, role, phone, caveSlug) {
+  var users = getUsers();
+  var nu = {
+    id: 'usr-' + Date.now().toString(36),
+    name: name,
+    email: email.trim().toLowerCase(),
+    role: role || 'client',
+    phone: phone || '+229 01 00 00 00',
+    caveSlug: caveSlug || S.slug,
+    tier: role === 'superadmin' ? 'Platine' : (role === 'gerant' ? 'Gérant' : 'Nouveau')
+  };
+  users.push(nu);
+  saveUsers(users);
+  return nu;
+}
+function updateUserRole(id, newRole) {
+  var users = getUsers();
+  users.forEach(function (u) { if (u.id === id) u.role = newRole; });
+  saveUsers(users);
+  if (currentUser && currentUser.id === id) {
+    currentUser.role = newRole;
+    save('auth_user', currentUser);
+  }
+}
+function deleteUser(id) {
+  var users = getUsers().filter(function (u) { return u.id !== id; });
+  saveUsers(users);
+  if (currentUser && currentUser.id === id) {
+    logoutUser();
+  }
+}
+
+var currentUser = load('auth_user', null);
+function isLogged() { return !!currentUser; }
+function isGerant() { return currentUser && (currentUser.role === 'gerant' || currentUser.role === 'superadmin'); }
+function isSuperAdmin() { return currentUser && currentUser.role === 'superadmin'; }
+function loginAs(u) {
+  currentUser = u;
+  save('auth_user', u);
+  toast('Connecté en tant que ' + u.name);
+  render(false);
+}
+function logoutUser() {
+  currentUser = null;
+  save('auth_user', null);
+  toast('Déconnexion effectuée');
+  if (location.hash.indexOf('#/admin') === 0) location.hash = '#/';
+  else render(false);
+}
+
 var cart = load('cart', []);
 var favs = load('favs', []);
 var ck = load('checkout', { name: '', phone: '', zone: '', address: '', email: '', note: '', ship: DELIV[0].id, pay: PAYS[0].id, momo: '', gift: false, giftMsg: '' });
 var F = load('filters', { cats: [], regions: [], years: [], pairs: [], min: null, max: null, sort: 'fav', q: '' });
 var recent = load('recent', ['Bordeaux 2015', 'Champagne Brut', 'Whisky 12 ans']);
 var shown = 6, drawerOpen = false, pdQty = 1, galIdx = 0, dPanel = false;
-function persist() { save('cart', cart); save('favs', favs); save('checkout', ck); save('filters', F); save('recent', recent); }
+var hlTab = 'bestsellers', faqOpen = { 0: true }, mapFilter = 'current', admTab = 'orders';
+var stockOverrides = load('stock_overrides', {});
+function getStock(p) { return stockOverrides[p.id] != null ? stockOverrides[p.id] : (p.lowStock ? 3 : (12 + (p.price % 17))); }
+function setStock(id, d) { var p = BY[id]; if (!p) return; stockOverrides[id] = Math.max(0, getStock(p) + d); save('stock_overrides', stockOverrides); }
+function persist() { save('cart', cart); save('favs', favs); save('checkout', ck); save('filters', F); save('recent', recent); save('stock_overrides', stockOverrides); }
 
 function cartCount() { return cart.reduce(function (a, l) { return a + l.qty; }, 0); }
 function cartLines() { return cart.filter(function (l) { return BY[l.id]; }).map(function (l) { return { p: BY[l.id], qty: l.qty, total: BY[l.id].price * l.qty }; }); }
@@ -149,16 +257,27 @@ function mapSvg() {
 function statusbar() { return '<div class="statusbar"><b>9:41</b><div class="icons">' + icon('signal') + icon('wifi') + icon('battery') + '</div></div>'; }
 function back(href) { return '<a class="slot" href="' + (href || '#/') + '" data-act="back" aria-label="Retour">' + icon('chev-left') + '</a>'; }
 function menuBtn() { return '<button class="slot r" data-act="drawer" aria-label="Menu">' + icon('menu') + '</button>'; }
-function mh(title, left, right) {
-  return '<header class="sh">' + (left || '<span class="slot"></span>') + '<h1>' + esc(title) + '</h1>' + (right === undefined ? menuBtn() : (right || '<span class="slot r"></span>')) + '</header>';
+function themeSunMoonSvg() {
+  return '<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>' +
+    '<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
 }
+
+function mh(title, left, right) {
+  var rHtml = right !== undefined ? right :
+    '<div style="display:flex;align-items:center;gap:6px">' +
+    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème" aria-label="Thème clair/sombre">' + themeSunMoonSvg() + '</button>' +
+    menuBtn() + '</div>';
+  return '<header class="sh">' + (left || '<span class="slot"></span>') + '<h1>' + esc(title) + '</h1>' + rHtml + '</header>';
+}
+
 function bottomNav(active) {
   var n = cartCount();
-  var tabs = [['home', '#/', 'home', 'Accueil'], ['cave', '#/catalogue', 'search', 'Cave'], ['cart', '#/panier', 'bag', 'Panier'], ['club', '#/compte', 'user', 'Club']];
+  var tabs = [['home', '#/', 'home', 'Accueil'], ['cave', '#/catalogue', 'search', 'Cave'], ['cart', '#/panier', 'bag', 'Panier'], ['club', (isLogged() ? '#/compte' : '#/connexion'), 'user', 'Compte']];
   return '<nav class="bn m-only" aria-label="Navigation principale"><div class="in">' + tabs.map(function (t) {
     return '<a href="' + t[1] + '" class="' + (active === t[0] ? 'on' : '') + '">' + icon(t[2]) + '<span>' + t[3] + '</span>' + (t[0] === 'cart' && n ? '<i class="badge">' + n + '</i>' : '') + '</a>';
   }).join('') + '</div><div class="home-ind"><i></i></div></nav>';
 }
+
 function hoursHtml(sep) { return (S.hours || []).map(function (h) { return esc(h.days) + ' : ' + esc(h.time); }).join(sep || '<br>'); }
 function socials() {
   var out = '';
@@ -168,21 +287,98 @@ function socials() {
   out += '<a href="' + waLink() + '" target="_blank" rel="noopener" aria-label="WhatsApp">' + icon('whatsapp', 16) + '</a>';
   return out;
 }
+
 function drawer() {
-  var links = [['#/', 'Accueil'], ['#/catalogue', 'Boutique · tout le catalogue']];
-  var hubDone = false;
-  CATS.forEach(function (c) {
-    if (HUB && c.group === 'vins') { if (!hubDone) { hubDone = true; links.push(['#/vins', 'Tous nos ' + WP.label.toLowerCase(), 'sub']); WINE.forEach(function (w) { links.push([clink(w), w.title, 'sub2']); }); } }
-    else links.push([clink(c), c.title, 'sub']);
-  });
-  links = links.concat([['#/journal', 'Le Journal'], ['#/club', CLUB.name || 'Club Privé'], ['#/services', 'Livraison & paiement'], ['#/recherche', 'Rechercher'], ['#/favoris', "Ma liste d'envies"], ['#/suivi', 'Suivi de commande'], ['#/compte', 'Mon compte']]);
+  var userHtml = '';
+  if (isLogged()) {
+    var roleBadge = isSuperAdmin()
+      ? '<span class="drawer-role-chip superadmin">SuperAdmin</span>'
+      : (isGerant() ? '<span class="drawer-role-chip gerant">Gérant</span>' : '<span class="drawer-role-chip client">Client</span>');
+
+    userHtml = '<div class="drawer-user-card">' +
+      '<div class="drawer-user-info">' +
+      '<div class="drawer-avatar">' + esc(initials(currentUser.name)) + '</div>' +
+      '<div class="drawer-user-meta">' +
+      '<b>' + esc(currentUser.name) + '</b>' +
+      roleBadge +
+      '<span>' + esc(currentUser.email) + '</span>' +
+      '</div></div>' +
+      '<button class="link2" data-act="logout" style="font-size:11px;padding:4px 0;color:var(--muted)">Déconnexion</button>' +
+      '</div>';
+  } else {
+    userHtml = '<div class="drawer-user-card">' +
+      '<div class="drawer-user-info">' +
+      '<div class="drawer-avatar" style="border-color:var(--border);color:var(--muted)">👤</div>' +
+      '<div class="drawer-user-meta">' +
+      '<b>Bienvenue à la Cave</b>' +
+      '<span>Commandes, favoris &amp; club</span>' +
+      '</div></div>' +
+      '<a class="drawer-btn-login" href="#/connexion" data-act="drawer-close">' + icon('user', 13) + ' Connexion</a>' +
+      '</div>';
+  }
+
+  var themePill = '<div class="drawer-theme-pill">' +
+    '<span>Mode d\'affichage</span>' +
+    '<div class="drawer-theme-switch">' +
+    '<button class="' + (currentTheme === 'dark' ? 'active' : '') + '" data-act="set-theme" data-v="dark">🌙 Sombre</button>' +
+    '<button class="' + (currentTheme === 'light' ? 'active' : '') + '" data-act="set-theme" data-v="light">☀️ Clair</button>' +
+    '</div></div>';
+
+  var quickGrid = '<div class="drawer-quick-grid">' +
+    '<a class="drawer-quick-tile" href="#/catalogue" data-act="drawer-close"><div class="drawer-quick-icon">🍷</div><span>Boutique</span></a>' +
+    '<a class="drawer-quick-tile" href="#/" data-act="drawer-close" onclick="setTimeout(function(){var m=document.getElementById(\'carte-section\');if(m)m.scrollIntoView({behavior:\'smooth\'});},100)"><div class="drawer-quick-icon">🗺️</div><span>Carte Caves</span></a>' +
+    '<a class="drawer-quick-tile" href="#/suivi" data-act="drawer-close"><div class="drawer-quick-icon">📦</div><span>Suivi Colis</span></a>' +
+    '<a class="drawer-quick-tile" href="#/favoris" data-act="drawer-close"><div class="drawer-quick-icon">❤️</div><span>Favoris</span></a>' +
+    '</div>';
+
+  var catChips = '<div class="drawer-sec-lbl">Nos Sélections &amp; Caves</div>' +
+    '<div class="drawer-cats-list">' +
+    '<a class="drawer-cat-row" href="#/categorie/vins-rouges" data-act="drawer-close"><div class="drawer-cat-left">🍷 <span>Vins Rouges Grands Crus</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/vins-blancs" data-act="drawer-close"><div class="drawer-cat-left">🥂 <span>Vins Blancs Frais</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/roses" data-act="drawer-close"><div class="drawer-cat-left">🌸 <span>Rosés Délicats</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/champagnes" data-act="drawer-close"><div class="drawer-cat-left">🍾 <span>Champagnes &amp; Bulles</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/spiritueux" data-act="drawer-close"><div class="drawer-cat-left">🥃 <span>Spiritueux Rares</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/coffrets-cadeaux" data-act="drawer-close"><div class="drawer-cat-left">🎁 <span>Coffrets à Offrir</span></div>' + icon('chev-right', 12) + '</a>' +
+    '</div>';
+
+  var servicesList = '<div class="drawer-sec-lbl">Privilèges &amp; Savoir-Faire</div>' +
+    '<div class="drawer-cats-list">' +
+    '<a class="drawer-cat-row" href="#/club" data-act="drawer-close"><div class="drawer-cat-left">👑 <span>Club Privé &amp; Fidélité</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/journal" data-act="drawer-close"><div class="drawer-cat-left">📖 <span>Le Journal du Sommelier</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/services" data-act="drawer-close"><div class="drawer-cat-left">🛵 <span>Livraison Express 2h &amp; MoMo</span></div>' + icon('chev-right', 12) + '</a>' +
+    '</div>';
+
+  var adminCard = '';
+  if (isGerant()) {
+    adminCard = '<a class="drawer-admin-card" href="#/admin" data-act="drawer-close">' +
+      '<div>' +
+      '<div class="drawer-admin-title">' + (isSuperAdmin() ? '👑 Console SuperAdmin' : '⚙️ Espace Gérant de Cave') + '</div>' +
+      '<div class="drawer-admin-sub">Gestion des stocks, commandes &amp; WhatsApp</div>' +
+      '</div>' +
+      icon('chev-right', 14) +
+      '</a>';
+  }
+
   return '<div class="drawer' + (drawerOpen ? ' open' : '') + '" id="drawer"><div class="ov" data-act="drawer-close"></div><aside class="pn" aria-label="Menu">' +
-    '<div class="top"><b class="lg-t">' + esc(logo) + '</b><button data-act="drawer-close" aria-label="Fermer">' + icon('x20') + '</button></div>' +
-    '<nav>' + links.map(function (l) { return '<a href="' + l[0] + '"' + (l[2] ? ' class="' + l[2] + '"' : '') + '>' + esc(l[1]) + icon('chev-right') + '</a>'; }).join('') + '</nav>' +
-    '<div class="info"><div>' + icon('pin', 14, 'c-accent') + ' <b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br>' + esc(S.address) + '</div><div>' + hoursHtml() + '</div><div>' + esc(S.phone) + '</div></div>' +
-    '<div class="visit" style="margin:0;padding:0;border:0;background:none"><div class="acts"><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="chip g" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'WhatsApp</a><a class="chip g" href="' + telLink() + '">' + icon('phone', 14) + 'Appeler</a></div></div>' +
-    '<div class="soc">' + socials() + '</div></aside></div>';
+    '<div class="drawer-head"><b class="lg-t">' + esc(logo) + '</b><button class="drawer-close-btn" data-act="drawer-close" aria-label="Fermer">' + icon('x20') + '</button></div>' +
+    '<div class="drawer-body">' +
+    userHtml +
+    themePill +
+    quickGrid +
+    (adminCard ? adminCard : '') +
+    catChips +
+    servicesList +
+    '</div>' +
+    '<div class="drawer-footer">' +
+    '<div class="drawer-contacts">' +
+    '<a class="wa" href="' + waLink('Bonjour ' + S.name + ', j\'aimerais avoir un conseil.') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + ' WhatsApp</a>' +
+    '<a href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + ' Itinéraire</a>' +
+    '<a href="' + telLink() + '">' + icon('phone', 14) + ' Appeler</a>' +
+    '</div>' +
+    '<div style="font-size:11px;color:var(--muted);text-align:center">' + esc(S.neighbourhood) + ' · ' + esc(S.city) + '<br>' + hoursHtml(' · ') + '</div>' +
+    '</div></aside></div>';
 }
+
 function dHeader(active) {
   var n = cartCount();
   var nav = [['shop', '#/catalogue', 'Boutique']], hubDone = false;
@@ -191,18 +387,50 @@ function dHeader(active) {
     else nav.push([c.id, clink(c), c.navLabel || c.label]);
   });
   nav.push(['journal', '#/journal', 'Journal'], ['club', '#/club', 'Club']);
+
+  var adminBtn = '';
+  if (isSuperAdmin()) {
+    adminBtn = '<a href="#/admin" class="nav-badge-admin superadmin" title="Console SuperAdmin">👑 SuperAdmin</a>';
+  } else if (isGerant()) {
+    adminBtn = '<a href="#/admin" class="nav-badge-admin gerant" title="Espace Gérance">⚙️ Gérant</a>';
+  }
+
+  var userLink = '';
+  if (isLogged()) {
+    userLink = '<a href="#/compte" class="gold" title="' + esc(currentUser.name) + '" style="display:flex;align-items:center;gap:6px">' +
+      '<span style="width:28px;height:28px;border-radius:14px;background:var(--surface-2);border:1px solid var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent)">' + esc(initials(currentUser.name)) + '</span>' +
+      '<span class="ell" style="max-width:96px;font-size:13px;font-weight:600">' + esc(currentUser.name.split(' ')[0]) + '</span></a>';
+  } else {
+    userLink = '<a href="#/connexion" class="muted" title="Se connecter / Compte" style="display:flex;align-items:center;gap:6px;font-size:13px">' +
+      icon('user') + '<span>Connexion</span></a>';
+  }
+
+  var themeBtn = '<button class="theme-btn" data-act="toggle-theme" title="Basculer thème clair/sombre" aria-label="Thème clair/sombre">' +
+    themeSunMoonSvg() +
+    '</button>';
+
   return '<header class="dh d-only"><div class="dw"><a class="logo lg-t" href="#/">' + esc(logo) + '</a><nav>' + nav.map(function (l) {
     var a = '<a href="' + l[1] + '" class="' + (active === l[0] ? 'on' : '') + '">' + esc(l[2]) + (l[3] ? icon('chev-down10') : '') + '</a>';
     return l[3] ? '<div class="dd">' + a + '<div class="ddm"><div>' + l[3].map(function (w) { return '<a href="' + clink(w) + '">' + esc(w.title) + '<small>' + refs(inCat(w).length) + '</small></a>'; }).join('') + '<a href="#/vins" class="all">Tous nos ' + esc(WP.label.toLowerCase()) + ' →</a></div></div></div>' : a;
-  }).join('') + '</nav><div class="ra"><a href="#/recherche" aria-label="Rechercher">' + icon('search') + '</a><a href="#/favoris" aria-label="Favoris">' + icon('heart20') + '</a><a href="#/panier" aria-label="Panier">' + icon('bag', 20) + (n ? '<span class="badge">' + n + '</span>' : '') + '</a><a href="#/compte" aria-label="Mon compte">' + icon('user') + '</a></div></div></header>';
+  }).join('') + '</nav><div class="ra">' +
+    '<a href="#/recherche" aria-label="Rechercher">' + icon('search') + '</a>' +
+    '<a href="#/favoris" aria-label="Favoris">' + icon('heart20') + '</a>' +
+    '<a href="#/panier" aria-label="Panier">' + icon('bag', 20) + (n ? '<span class="badge">' + n + '</span>' : '') + '</a>' +
+    userLink +
+    adminBtn +
+    themeBtn +
+    '</div></div></header>';
 }
+
 function dFooter() {
   var catLinks = '<a href="#/catalogue">Tout le catalogue</a>' + (HUB ? '<a href="#/vins">Tous nos ' + esc(WP.label.toLowerCase()) + '</a>' : '') + CATS.map(function (c) { return '<a href="' + clink(c) + '">' + esc(c.title) + '</a>'; }).join('');
+  var adminFooterLink = isGerant() ? '<a href="#/admin" class="gold">⚙️ Espace Gérant</a>' : '';
+
   return '<footer class="df d-only"><div class="dw"><div class="cols">' +
     '<div class="c1"><p class="lg lg-t">' + esc(logo) + '</p><p>' + esc(S.about || S.slogan) + '</p><div class="soc">' + socials() + '</div></div>' +
     '<div class="col"><h4>Boutique</h4><div>' + catLinks + '</div></div>' +
-    '<div class="col"><h4>Services</h4><div><a href="#/club">' + esc(CLUB.name || 'Club Privé') + '</a><a href="#/services">Livraison & paiement</a><a href="#/journal">Le Journal</a><a href="#/suivi">Suivi de commande</a></div></div>' +
-    '<div class="col"><h4>Aide</h4><div><a href="#/compte">Mon compte</a><a href="#/favoris">Mes favoris</a><a href="#/panier">Mon panier</a><a href="' + waLink('Bonjour, j\'ai une question.') + '" target="_blank" rel="noopener">Nous écrire</a></div></div>' +
+    '<div class="col"><h4>Services</h4><div><a href="#/club">' + esc(CLUB.name || 'Club Privé') + '</a><a href="#/services">Livraison & paiement</a><a href="#/journal">Le Journal</a><a href="#/suivi">Suivi de commande</a>' + adminFooterLink + '</div></div>' +
+    '<div class="col"><h4>Aide</h4><div><a href="' + (isLogged() ? '#/compte' : '#/connexion') + '">Mon compte</a><a href="#/favoris">Mes favoris</a><a href="#/panier">Mon panier</a><a href="' + waLink('Bonjour, j\'ai une question.') + '" target="_blank" rel="noopener">Nous écrire</a></div></div>' +
     '<div class="col info"><h4>Nous trouver</h4><div><span>' + esc(S.address) + '<br>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</span><span>' + hoursHtml() + '</span><a href="' + telLink() + '">' + esc(S.phone) + '</a><a href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener" class="gold">Itinéraire Google Maps →</a></div></div>' +
     '</div><div class="bot"><p>© ' + new Date().getFullYear() + ' ' + esc(S.name) + ". L'abus d'alcool est dangereux pour la santé, à consommer avec modération. Vente interdite aux mineurs.</p><p>" + esc(S.neighbourhood) + ' · ' + esc(S.city) + ' · ' + esc(S.country || 'Bénin') + '</p></div></div></footer>';
 }
@@ -258,41 +486,274 @@ function sortLabel() { return (SORTS.filter(function (s) { return s[0] === F.sor
 function resetFilters() { F.cats = []; F.regions = []; F.years = []; F.pairs = []; F.min = null; F.max = null; persist(); }
 function toggleIn(arr, v) { var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); }
 
+/* =========================== DONNÉES COMPLÉMENTAIRES =========================== */
+var CAVES_DATA = [
+  { slug: 'cave-sainte-aurelie', name: 'Cave Sainte Aurélie', lat: 6.3535, lng: 2.3385, neighbourhood: 'Fidjrossè', address: 'Route des pêches, carrefour Club des Rois, Togbin plage, Fidjrossè', phone: '+229 01 53 02 77 36', whatsapp: '2290195316910', url: '../cave-sainte-aurelie/' },
+  { slug: 'la-belle-robe', name: 'La Belle Robe', lat: 6.3630, lng: 2.3920, neighbourhood: 'Vodjè', address: 'Rue 571, Vodjè (Plus Code 999W+P7)', phone: '+229 01 97 12 34 56', whatsapp: '2290197123456', url: '../la-belle-robe/' },
+  { slug: 'la-cle-des-chateaux', name: 'La Clé des Châteaux', lat: 6.3601, lng: 2.4342, neighbourhood: 'Ganhi', address: 'Avenue Clozel, Ganhi & SOBEBRA Akpakpa', phone: '+229 01 21 31 45 67', whatsapp: '2290121314567', url: '../la-cle-des-chateaux/' },
+  { slug: 'la-feuille-de-vigne', name: 'La Feuille de Vigne', lat: 6.3715, lng: 2.4280, neighbourhood: 'Saint-Michel', address: 'Bd Saint-Michel, face à l\'Église, Gbedokpo', phone: '+229 01 21 32 10 98', whatsapp: '2290121321098', url: '../la-feuille-de-vigne/' },
+  { slug: 'le-cellier', name: 'Le Cellier', lat: 6.3685, lng: 2.4490, neighbourhood: 'Akpakpa', address: 'Sodjèatimè, lot 110, Akpakpa', phone: '+229 01 95 44 33 22', whatsapp: '2290195443322', url: '../le-cellier/' },
+  { slug: 'le-spiritueux', name: 'Le Spiritueux — Cave des Vins Rares', lat: 6.3760, lng: 2.4110, neighbourhood: 'Missitè', address: 'Missitè / Saint-Jean, carrefour Marina', phone: '+229 01 96 77 88 99', whatsapp: '2290196778899', url: '../le-spiritueux/' },
+  { slug: 'le-vinophile', name: 'Le Vinophile', lat: 6.3705, lng: 2.4220, neighbourhood: 'Saint-Michel', address: 'Avenue Roi Guézo, Saint-Michel', phone: '+229 01 21 30 77 66', whatsapp: '2290121307766', url: '../le-vinophile/' },
+  { slug: 'le-vinqueur', name: 'Le Vinqueur', lat: 6.3520, lng: 2.3650, neighbourhood: 'Fidjrossè', address: 'Fidjrossè plage, Fiyégnon', phone: '+229 01 97 55 66 77', whatsapp: '2290197556677', url: '../le-vinqueur/' },
+  { slug: 'maison-castel-benin', name: 'Maison Castel Bénin', lat: 6.3575, lng: 2.4045, neighbourhood: 'Haie Vive', address: 'Pavés de la Haie Vive, 100 m avant le Calypso', phone: '+229 01 21 30 11 22', whatsapp: '2290121301122', url: '../maison-castel-benin/' },
+  { slug: 'the-truth-winery', name: 'The Truth Winery', lat: 6.3690, lng: 2.4210, neighbourhood: 'Saint-Michel', address: 'Saint-Michel, Cotonou', phone: '+229 01 95 11 22 33', whatsapp: '2290195112233', url: '../the-truth-winery/' }
+];
+
+var OCCASIONS = [
+  { id: 'anniversaire', title: 'Anniversaire & Célébrations', tag: 'Grands Crus', image: 'assets/img/banner-glasses.webp', desc: 'Magnums festifs, champagnes bruts et coffrets bois sur-mesure pour célébrer en beauté.', link: '#/categorie/champagnes', cta: 'Voir les champagnes' },
+  { id: 'mariage', title: 'Mariages & Réceptions', tag: 'Sur-mesure', image: 'assets/img/event-dinner.webp', desc: 'Dégustation offerte, calcul des bouteilles selon votre menu, livraison sur place et reprise des non-ouverts.', link: waLink('Bonjour ' + S.name + ', je prépare un mariage / une grande réception et j\'aimerais un devis personnalisé.'), cta: 'Devis Mariage WhatsApp', isExternal: true },
+  { id: 'entreprise', title: 'Cadeaux d\'Entreprise', tag: 'B2B & Affaires', image: 'assets/img/banner-wood-box.webp', desc: 'Caisses bois d\'exception, message manuscrit offert, facturation société et livraison groupée.', link: giftLink(), cta: 'Composer un coffret' },
+  { id: 'apero', title: 'Apéro Chic & Plage', tag: 'Fraîcheur', image: 'assets/img/banner-gift.webp', desc: 'Rosés pâles de Provence, blancs minéraux et spiritueux choisis pour savourer entre amis face à la mer.', link: '#/vins', cta: 'Nos vins d\'apéritif' }
+];
+
+var FAQ_DATA = [
+  { q: 'Quels sont les délais et quartiers de livraison à Cotonou et ses environs ?', a: 'Nous livrons dans tout Cotonou en express sous 2 heures (Fidjrossè, Haie Vive, Cadjèhoun, Ganhi, Akpakpa, Cocotiers...). Nous desservons également Abomey-Calavi et la route des pêches. Le retrait gratuit à la cave est préparé en 30 minutes.' },
+  { q: 'Comment s\'effectue le paiement par Mobile Money ou à la livraison ?', a: 'Vous pouvez régler via MTN Mobile Money, Moov Money (Flooz) ou Celtiis Cash dès confirmation de la commande. Le règlement en espèces ou par MoMo directement au livreur à la réception est également possible sans frais additionnels.' },
+  { q: 'Comment garantissez-vous la conservation des vins sous le climat chaud de Cotonou ?', a: 'Toutes nos bouteilles sont entreposées dans notre cave climatisée à température constante (14°C – 16°C) et à hygrométrie contrôlée. Lors de la livraison, elles sont calées dans des caissons isothermes protégés des chocs et de la chaleur.' },
+  { q: 'Est-il possible de faire livrer un coffret cadeau avec un mot personnalisé ?', a: 'Oui, sans surcoût ! Cochez simplement « Ceci est un cadeau » au moment de votre commande. Nous joignons une carte manuscrite avec vos mots et préparons un emballage cadeau soigné.' },
+  { q: 'Proposez-vous des tarifs dégressifs et la reprise pour les mariages ?', a: 'Oui. Pour les mariages et grandes réceptions, notre sommelier établit un devis optimisé selon vos plats et vos invités. Nous reprenons toutes les bouteilles non débouchées et intactes après l\'événement.' },
+  { q: 'Que se passe-t-il si une bouteille présente un défaut (goût de bouchon) ?', a: 'Votre satisfaction est totale : si un flacon présente un goût de bouchon, signalez-le nous avec une photo sur WhatsApp ou passez à la cave. Nous procédons immédiatement à un échange ou à un avoir.' }
+];
+
+var REVIEWS_DATA = [
+  { name: 'Dr. Marc Allagbé', city: 'Haie Vive, Cotonou', stars: 5, date: 'Il y a 3 jours', text: 'Commande passée un samedi soir pour un dîner improvisé. Livrée en 40 minutes à la Haie Vive, le champagne était impeccablement frais. Paiement MoMo en 10 secondes. Chapeau !', bottle: 'Champagne Brut Tradition' },
+  { name: 'Sandrine Kpadonou', city: 'Ganhi, Cotonou', stars: 5, date: 'Il y a 1 semaine', text: 'J’ai fait livrer un coffret prestige bois pour l’anniversaire d’un collaborateur avec une carte manuscrite. Très soigné, le bordeaux a fait sensation.', bottle: 'Coffret Prestige Bois' },
+  { name: 'Cédric Dossou-Yovo', city: 'Fidjrossè, Cotonou', stars: 5, date: 'Il y a 2 semaines', text: 'Enfin une vraie cave à Cotonou où les vins ne souffrent pas de la chaleur ! Les rouges sont conservés dans les règles de l\'art. Les conseils sur WhatsApp m\'ont été très précieux.', bottle: 'Cuvée Prestige Médoc 2016' }
+];
+
+/* --- Générateurs de composants d'accueil --- */
+function trustBar(mode) {
+  var isD = mode === 'd';
+  var items = [
+    { ic: '⚡', t: 'Livraison Express 2 h', d: 'Bouteilles fraîches & calées dans tout Cotonou' },
+    { ic: '📱', t: 'Paiement MoMo & Cash', d: 'MTN, Moov, Celtiis ou à la livraison' },
+    { ic: '🍷', t: '100% Authentique', d: 'Conservation idéale en cave climatisée' },
+    { ic: '👨‍🍳', t: 'Conseil Sommelier 7j/7', d: 'Réponse rapide sur WhatsApp' }
+  ];
+  return '<section class="trust-bar" aria-label="Nos garanties">' +
+    '<div class="' + (isD ? 'dw ' : '') + 'trust-grid">' +
+    items.map(function (it) {
+      return '<div class="trust-item"><div class="trust-icon">' + it.ic + '</div><div class="trust-text"><h4>' + esc(it.t) + '</h4><p>' + esc(it.d) + '</p></div></div>';
+    }).join('') +
+    '</div></section>';
+}
+
+function homeHighlights(mode) {
+  var isD = mode === 'd';
+  var bestsellers = P.filter(function (p) { return p.featured; });
+  if (bestsellers.length < 4) bestsellers = P.slice(0, 4);
+  var news = P.filter(function (p) { return p.year && p.year >= 2019 && !p.featured; });
+  if (news.length < 4) news = P.slice(4, 8);
+  var activeList = hlTab === 'bestsellers' ? bestsellers : news;
+  var items = isD ? activeList.slice(0, 4).map(function (p) { return dpcard(p); }).join('') : activeList.slice(0, 4).map(pcard).join('');
+  
+  return '<section class="home-highlights ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="hl-header">' +
+    '<div><h2 class="' + (isD ? 'dh2' : 'sec-h') + '">Sélection du Moment</h2><p class="muted" style="font-size:13px;margin:4px 0 0">Nos meilleures références et derniers arrivages</p></div>' +
+    '<div class="hl-tabs">' +
+    '<button class="hl-tab' + (hlTab === 'bestsellers' ? ' on' : '') + '" data-act="hl-tab" data-v="bestsellers">🏆 Meilleures Ventes <span class="badge">' + bestsellers.length + '</span></button>' +
+    '<button class="hl-tab' + (hlTab === 'new' ? ' on' : '') + '" data-act="hl-tab" data-v="new">✨ Nouveautés <span class="badge">' + news.length + '</span></button>' +
+    '</div></div>' +
+    '<div class="hl-grid">' + items + '</div>' +
+    '<div style="text-align:center;margin-top:24px"><a class="' + (isD ? 'dbtn o' : 'btn btn-o') + '" href="#/catalogue" style="display:inline-flex;width:auto">Explorer toute la collection (' + P.length + ' flacons) →</a></div>' +
+    '</section>';
+}
+
+function occasionsHtml(mode) {
+  var isD = mode === 'd';
+  return '<section class="occasions-sec ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="sec-h" style="margin-bottom:20px"><h2 class="' + (isD ? 'dh2' : '') + '">Des Idées par Occasion</h2><a href="#/catalogue">Tout voir</a></div>' +
+    '<div class="occ-grid">' +
+    OCCASIONS.map(function (o) {
+      return '<a class="occ-card" href="' + esc(o.link) + '"' + (o.isExternal ? ' target="_blank" rel="noopener"' : '') + '>' +
+        '<img class="occ-bg" src="' + esc(o.image) + '" alt="' + esc(o.title) + '" loading="lazy" decoding="async">' +
+        '<div class="occ-overlay"></div>' +
+        '<div class="occ-content">' +
+        '<span class="occ-tag">' + esc(o.tag) + '</span>' +
+        '<h3 class="occ-title">' + esc(o.title) + '</h3>' +
+        '<p class="occ-desc">' + esc(o.desc) + '</p>' +
+        '<span class="occ-cta">' + esc(o.cta) + ' <span>→</span></span>' +
+        '</div></a>';
+    }).join('') +
+    '</div></section>';
+}
+
+function sommelierAdviceHtml(mode) {
+  var isD = mode === 'd';
+  var waAdviceLink = waLink('Bonjour ' + S.name + ', j\'aimerais un conseil personnalisé du sommelier pour un repas / un événement.');
+  return '<section class="sommelier-sec ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="sommelier-card">' +
+    '<div class="sommelier-avatar-wrap">' +
+    '<div class="sommelier-avatar"><img src="' + esc(IMG.avatar || 'assets/img/avatar.webp') + '" alt="Sommelier de la cave" loading="lazy"></div>' +
+    '<div class="sommelier-info"><h4>Le Sommelier</h4><p>' + esc(S.name) + '</p></div>' +
+    '</div>' +
+    '<div class="sommelier-quote">' +
+    '<span class="sommelier-quote-mark" aria-hidden="true">“</span>' +
+    '<div class="sommelier-badge">' + icon('award', 14) + 'Conseil du Sommelier</div>' +
+    '<h3>Comment bien servir et savourer nos vins à Cotonou ?</h3>' +
+    '<p class="sommelier-text">« Sous le climat chaud de Cotonou, ne laissez jamais un vin rouge monter à température ambiante (28°-32°C). Passez-le 20 minutes au frais avant dégustation : à 16°-18°C, il révélera ses tanins soyeux sans sensation de lourdeur. Pour un poisson braisé ou un poulet bicyclette local, privilégiez un blanc vif comme notre Sancerre ou un rosé frais. »</p>' +
+    '<div class="sommelier-actions">' +
+    '<a class="sommelier-wa-btn" href="' + waAdviceLink + '" target="_blank" rel="noopener">' + icon('whatsapp', 16) + 'Demander conseil sur WhatsApp</a>' +
+    '<a class="' + (isD ? 'dbtn o' : 'btn btn-o') + '" href="#/journal" style="width:auto">Lire nos accords mets &amp; vins</a>' +
+    '</div></div></div></section>';
+}
+
+function statsCountersHtml(mode) {
+  var isD = mode === 'd';
+  var stats = [
+    { target: 350, prefix: '+', suffix: '', label: 'Références en cave', sub: 'Vins, champagnes & spiritueux' },
+    { target: 2, prefix: '', suffix: ' h', label: 'Livraison express', sub: 'Partout dans Cotonou & environs' },
+    { target: 99, prefix: '', suffix: '.4%', label: 'Clients satisfaits', sub: 'Commandes vérifiées' },
+    { target: 100, prefix: '', suffix: '%', label: 'Flacons certifiés', sub: 'Conservation climatisée' }
+  ];
+  return '<section class="stats-sec ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="stats-grid">' +
+    stats.map(function (s) {
+      return '<div class="stat-item">' +
+        '<div class="stat-number" data-counter="' + s.target + '" data-prefix="' + s.prefix + '" data-suffix="' + s.suffix + '">' + s.prefix + s.target + s.suffix + '</div>' +
+        '<div class="stat-label">' + esc(s.label) + '</div>' +
+        '<div class="stat-sub">' + esc(s.sub) + '</div>' +
+        '</div>';
+    }).join('') +
+    '</div></section>';
+}
+
+function interactiveMapSection(mode) {
+  var isD = mode === 'd';
+  var cur = CAVES_DATA.filter(function (c) { return c.slug === S.slug; })[0] || CAVES_DATA[0];
+  var itLink = S.mapsUrl || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(S.name + ' ' + (S.neighbourhood || '') + ' Cotonou'));
+  var waDirect = waLink('Bonjour ' + S.name + ', je prépare mon passage à la cave.');
+  
+  return '<section id="carte-section" class="map-section ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="map-card-wrapper">' +
+    '<div class="map-bar">' +
+    '<h3>' + icon('pin', 18, 'c-accent') + ' Emplacement &amp; Itinéraire</h3>' +
+    '<div class="map-filter-btns">' +
+    '<button class="map-pill' + (mapFilter === 'current' ? ' on' : '') + '" data-act="map-filter" data-v="current">📍 ' + esc(S.name) + '</button>' +
+    '<button class="map-pill' + (mapFilter === 'all' ? ' on' : '') + '" data-act="map-filter" data-v="all">🗺️ Toutes les caves de Cotonou (' + CAVES_DATA.length + ')</button>' +
+    '</div></div>' +
+    '<div class="map-container-outer">' +
+    '<div class="map-viewport">' +
+    '<div id="cave-leaflet-map">' + mapSvg() + '</div>' +
+    '</div>' +
+    '<div class="map-info-side">' +
+    '<div class="map-info-meta">' +
+    '<span class="gold" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Cave &amp; Dégustation</span>' +
+    '<h4>' + esc(S.name) + '</h4>' +
+    '<div class="map-addr-row">' + icon('pin', 16, 'c-accent') + '<div><b>' + esc(S.neighbourhood || '') + ', ' + esc(S.city || 'Cotonou') + '</b><br>' + esc(S.address || '') + '</div></div>' +
+    '<div class="map-hours-box">' +
+    '<div class="cur-status">Ouvert aujourd\'hui</div>' +
+    hoursHtml() +
+    '</div>' +
+    '</div>' +
+    '<div class="map-actions-group">' +
+    '<a class="map-btn-it" href="' + esc(itLink) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire Maps</a>' +
+    '<a class="map-btn-wa" href="' + waDirect + '" target="_blank" rel="noopener">' + icon('whatsapp', 16) + 'WhatsApp</a>' +
+    '<a class="map-btn-tel" href="' + telLink() + '">' + icon('phone', 14) + esc(S.phone || 'Appeler la cave') + '</a>' +
+    '</div></div></div></div></section>';
+}
+
+function reviewsHtml(mode) {
+  var isD = mode === 'd';
+  return '<section class="reviews-sec ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="sec-h" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between">' +
+    '<div><h2 class="' + (isD ? 'dh2' : '') + '">Avis de nos Amateurs</h2><span class="gold" style="font-size:12.5px;font-weight:600">★ 4.9/5 sur plus de 180 avis vérifiés</span></div>' +
+    (!isD ? '<div class="rev-arrows m-only">' +
+      '<button class="rev-ar-btn" data-act="rev-prev" aria-label="Avis précédent">←</button>' +
+      '<button class="rev-ar-btn" data-act="rev-next" aria-label="Avis suivant">→</button>' +
+      '</div>' : '') +
+    '</div>' +
+    '<div class="reviews-carousel-wrap">' +
+    '<div class="reviews-grid" id="reviewsGrid">' +
+    REVIEWS_DATA.map(function (r) {
+      return '<div class="rev-card">' +
+        '<div>' +
+        '<div class="rev-stars">★★★★★</div>' +
+        '<p class="rev-text">“' + esc(r.text) + '”</p>' +
+        '</div>' +
+        '<div class="rev-footer">' +
+        '<div class="rev-avatar">' + initials(r.name) + '</div>' +
+        '<div class="rev-client"><h5>' + esc(r.name) + '</h5><span>' + esc(r.city) + ' · ' + esc(r.date) + '</span></div>' +
+        '<div class="rev-badge">' + icon('check', 10) + ' ' + esc(r.bottle) + '</div>' +
+        '</div></div>';
+    }).join('') +
+    '</div>' +
+    (!isD ? '<div class="rev-dots" id="revDots">' + REVIEWS_DATA.map(function (_, i) { return '<span class="rev-dot' + (i === 0 ? ' on' : '') + '"></span>'; }).join('') + '</div>' : '') +
+    '</div></section>';
+}
+
+function faqHtml(mode) {
+  var isD = mode === 'd';
+  return '<section class="faq-sec ' + (isD ? 'dw' : 'sec') + '">' +
+    '<div class="sec-h" style="margin-bottom:20px"><h2 class="' + (isD ? 'dh2' : '') + '">Questions Fréquentes (FAQ)</h2><a href="' + waLink('Bonjour, j\'ai une question qui n\'est pas dans la FAQ.') + '" target="_blank" rel="noopener">Poser une question</a></div>' +
+    '<div class="faq-list">' +
+    FAQ_DATA.map(function (item, idx) {
+      var isOpen = !!faqOpen[idx];
+      return '<div class="faq-item' + (isOpen ? ' open' : '') + '">' +
+        '<button class="faq-question" data-act="faq-tog" data-i="' + idx + '" aria-expanded="' + isOpen + '">' +
+        '<span>' + esc(item.q) + '</span>' +
+        '<span class="faq-ic">' + icon('chev-down12') + '</span>' +
+        '</button>' +
+        '<div class="faq-answer"><p>' + esc(item.a) + '</p></div>' +
+        '</div>';
+    }).join('') +
+    '</div></section>';
+}
+
+function floatingWhatsappHtml() {
+  var dismissed = false;
+  try { dismissed = sessionStorage.getItem('wa_bubble_closed') === '1'; } catch (e) {}
+  return '<aside class="floating-wa" aria-label="Assistance WhatsApp">' +
+    '<div class="fwa-bubble' + (dismissed ? ' fwa-hidden' : '') + '" id="fwaBubble">' +
+    '<button class="fwa-close" data-act="fwa-dismiss" aria-label="Fermer la bulle">&times;</button>' +
+    '<div class="fwa-text">' +
+    '<strong>Conseil Sommelier Direct</strong>' +
+    '<p>Une question sur un flacon ou une livraison ? Discutez en direct.</p>' +
+    '</div></div>' +
+    '<a class="fwa-btn" href="' + waLink('Bonjour ' + S.name + ', j\'aimerais un conseil sur vos vins.') + '" target="_blank" rel="noopener" aria-label="Discuter sur WhatsApp">' +
+    '<span class="fwa-pulse"></span>' +
+    icon('whatsapp', 26) +
+    '</a></aside>';
+}
+
 /* =========================== vues =========================== */
 var V = {};
 var H = S.hero || {};
 
-/* ---- Accueil ---- */
+/* ---- Accueil enrichi ---- */
 V.home = function () {
-  var feat = P.filter(function (p) { return p.featured; }); if (!feat.length) feat = P.slice(0, 4);
-  var lim = P.filter(function (p) { return p.limited; });
   var mcats = CATS.filter(function (c) { return c.mobileHome !== false; });
   var m = statusbar() +
-    '<header class="sh"><a href="#/" class="slot lg-t" style="width:auto;font-family:var(--serif);font-weight:700;font-size:18px;text-transform:uppercase;white-space:nowrap">' + esc(logo) + '</a>' + menuBtn() + '</header>' +
-    '<div class="v home">' + carousel('m') +
+    '<header class="sh">' +
+    '<a href="#/" class="slot-logo lg-t" style="font-family:var(--serif);font-weight:700;font-size:16px;text-transform:uppercase;color:var(--text);letter-spacing:.03em;display:flex;align-items:center;gap:6px">' +
+    '<span style="font-size:18px">🍷</span> ' + esc(logo) + '</a>' +
+    '<div style="display:flex;align-items:center;gap:6px">' +
+    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème" aria-label="Thème clair/sombre">' + themeSunMoonSvg() + '</button>' +
+    menuBtn() + '</div></header>' +
+    '<div class="v home">' +
+    carousel('m') +
+    trustBar('m') +
+    homeHighlights('m') +
     '<nav class="cats" aria-label="Catégories">' + mcats.map(function (c) { return '<a href="' + clink(c) + '"><span class="iw">' + icon(c.icon || 'wine') + '</span>' + esc(c.label) + '</a>'; }).join('') + '</nav>' +
-    '<section class="sec"><div class="sec-h"><h3>' + esc(T.picks) + '</h3><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="hscroll">' + feat.map(pcard).join('') + '</div></section>' +
-    (lim.length ? '<section class="limited"><h3>' + esc(T.limited) + '</h3>' + lim.map(function (p) {
-      return '<a class="banner" href="' + plink(p) + '">' + imgTag(p.limited.banner || p.image, p.name) + '<p class="t">' + esc(p.name) + '</p><p class="s">' + esc(p.limited.desc || p.sub) + '</p><div class="r"><b>' + fmt(p.price) + '</b><span>/ ' + esc(p.limited.note || '') + '</span></div></a>';
-    }).join('') + '</section>' : '') +
-    '<section class="visit card" style="margin-bottom:24px"><h3>Visitez la cave</h3>' +
-    '<div class="row">' + icon('pin', 16) + '<div><b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br><span class="muted">' + esc(S.address) + '</span></div></div>' +
-    '<div class="row">' + icon('time', 16) + '<div class="muted">' + hoursHtml() + '</div></div>' +
-    '<div class="acts"><a class="chip g" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="chip g" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 14) + 'WhatsApp</a><a class="chip g" href="' + telLink() + '">' + icon('phone', 14) + 'Appeler</a></div></section></div>';
+    occasionsHtml('m') +
+    sommelierAdviceHtml('m') +
+    statsCountersHtml('m') +
+    interactiveMapSection('m') +
+    reviewsHtml('m') +
+    faqHtml('m') +
+    '</div>';
 
   var d = carousel('d') +
+    trustBar('d') +
+    homeHighlights('d') +
     '<section class="dw dsec"><h2 class="dh2">Explorez la Cave</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
-    '<section class="dw dsec"><div class="dsh"><h2 class="dh2">' + esc(T.picks) + '</h2><a href="#/catalogue">' + esc(T.seeAll) + '</a></div><div class="dgrid g4">' + feat.slice(0, 4).map(function (p) { return dpcard(p); }).join('') + '</div></section>' +
-    (lim.length ? '<section class="dlim"><div class="dw dsec"><h2 class="dh2">' + esc(T.limited) + '</h2><div class="row">' + lim.slice(0, 2).map(function (p) {
-      return '<a class="pban" href="' + plink(p) + '">' + imgTag(p.limited.bannerWide || p.limited.banner || p.image, p.name) + '<p class="t">' + esc(p.name) + '</p><p class="s">' + esc(p.limited.desc || p.sub) + '</p><p class="p">' + fmt(p.price) + ' / ' + esc(p.limited.note || '') + '</p></a>';
-    }).join('') + '</div></div></section>' : '') +
-    '<section class="dgift"><div class="dw"><div class="gi">' + uimg('giftBanner', 'Coffret cadeau') + '</div><div class="gc"><h2>' + esc(T.giftTitle) + '</h2><p>' + esc(T.giftText) + '</p><a class="dbtn f" href="' + giftLink() + '">' + esc(T.giftCta) + '</a></div></div></section>' +
-    '<section class="dvisit"><div class="dw"><div class="vi dcard"><h2>Nous trouver</h2>' +
-    '<div class="row">' + icon('pin', 18) + '<div><b>' + esc(S.neighbourhood) + ', ' + esc(S.city) + '</b><br>' + esc(S.address) + '</div></div>' +
-    '<div class="row">' + icon('time', 18) + '<div>' + hoursHtml() + '</div></div>' +
-    '<div class="row">' + icon('phone', 18) + '<div><a href="' + telLink() + '">' + esc(S.phone) + '</a></div></div>' +
-    '<div class="acts"><a class="dbtn f" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener">' + icon('pin', 14) + 'Itinéraire</a><a class="dbtn wa" style="height:auto;padding:12px 24px;font-size:13px" href="' + waLink('Bonjour ' + S.name + ' !') + '" target="_blank" rel="noopener">' + icon('whatsapp', 16) + 'WhatsApp</a></div></div>' +
-    '<a class="dmap" href="' + esc(S.mapsUrl) + '" target="_blank" rel="noopener" aria-label="Ouvrir Google Maps">' + mapSvg() + '<span class="pill">' + esc(S.name) + ' · ' + esc(S.neighbourhood) + '</span></a></div></section>' +
+    occasionsHtml('d') +
+    sommelierAdviceHtml('d') +
+    statsCountersHtml('d') +
+    interactiveMapSection('d') +
+    reviewsHtml('d') +
+    faqHtml('d') +
     '<section class="dnews"><div class="dw"><h2 class="dh2">' + esc(T.newsTitle) + '</h2><p>' + esc(T.newsText) + '</p><form data-form="news"><input type="tel" name="tel" placeholder="Votre numéro WhatsApp" aria-label="Numéro WhatsApp"><button type="submit">S\'abonner</button></form></div></section>';
   return { m: m, d: d, nav: 'home', dnav: '' };
 };
@@ -769,23 +1230,86 @@ V.suivi = function () {
   return { m: m, d: d, nav: 'cart', dnav: '' };
 };
 
+/* ---- Authentification (Connexion & Inscription) ---- */
+V.connexion = function () {
+  var authTab = load('auth_tab', 'login');
+  if (isLogged()) {
+    var roleBadge = isSuperAdmin()
+      ? '<span class="adm-role-badge superadmin">SuperAdmin</span>'
+      : (isGerant() ? '<span class="adm-role-badge gerant">Gérant</span>' : '<span class="adm-role-badge client">Client VIP</span>');
+
+    var pCard = '<div class="auth-card" style="text-align:center">' +
+      '<div style="width:68px;height:68px;border-radius:50%;background:var(--surface-2);border:2px solid var(--accent);color:var(--accent);font-size:24px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 16px">' + esc(initials(currentUser.name)) + '</div>' +
+      '<h2 style="margin:0 0 6px 0">' + esc(currentUser.name) + '</h2>' +
+      '<p class="sub" style="margin-bottom:14px">' + esc(currentUser.email) + ' · ' + roleBadge + '</p>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:20px">Téléphone : ' + esc(currentUser.phone || '+229 01 00 00 00') + '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:10px">' +
+      (isGerant() ? '<a class="btn btn-f" href="#/admin">⚙️ Accéder au Tableau de Bord Gérance</a>' : '') +
+      '<a class="btn btn-o" href="#/compte">Consulter mes Commandes &amp; Club</a>' +
+      '<button class="btn btn-o" data-act="logout" style="border-color:var(--border);color:var(--muted)">Se Déconnecter</button>' +
+      '</div></div>';
+
+    return { m: statusbar() + mh('Mon Compte', back('#/')) + '<div class="auth-page">' + pCard + '</div>', d: '<section class="dw auth-page">' + pCard + '</section>', nav: 'club', dnav: '', title: 'Mon Compte — ' + currentUser.name };
+  }
+
+  var cHtml = '<div class="auth-card">' +
+    '<h2>Espace Membre &amp; Gérance</h2>' +
+    '<p class="sub">Accédez à votre compte client ou à votre espace gérant sécurisé.</p>' +
+    '<div class="auth-tabs">' +
+    '<button class="auth-tab-btn' + (authTab === 'login' ? ' on' : '') + '" data-act="auth-tab" data-v="login">Se Connecter</button>' +
+    '<button class="auth-tab-btn' + (authTab === 'register' ? ' on' : '') + '" data-act="auth-tab" data-v="register">Créer un Compte</button>' +
+    '</div>' +
+    (authTab === 'login' ?
+      '<form data-form="auth-login">' +
+      '<div class="auth-fld"><label>Adresse e-mail</label><input type="email" id="auth-email" placeholder="ex: client@cotonou.bj" required></div>' +
+      '<div class="auth-fld"><label>Mot de passe</label><input type="password" id="auth-pwd" placeholder="••••••••" required></div>' +
+      '<button type="submit" class="auth-btn-submit">Connexion Sécurisée</button>' +
+      '</form>' :
+      '<form data-form="auth-register">' +
+      '<div class="auth-fld"><label>Nom complet</label><input type="text" id="reg-name" placeholder="ex: Patrice Bio" required></div>' +
+      '<div class="auth-fld"><label>Adresse e-mail</label><input type="email" id="reg-email" placeholder="ex: patrice@cotonou.bj" required></div>' +
+      '<div class="auth-fld"><label>Téléphone WhatsApp</label><input type="tel" id="reg-phone" placeholder="+229 01 00 00 00" required></div>' +
+      '<div class="auth-fld"><label>Mot de passe</label><input type="password" id="reg-pwd" placeholder="••••••••" required></div>' +
+      '<button type="submit" class="auth-btn-submit">Créer mon Compte</button>' +
+      '</form>'
+    ) +
+    '<div class="auth-demo-box">' +
+    '<p>Comptes de test rapides (1-clic) :</p>' +
+    '<div class="demo-acc-btns">' +
+    '<button class="demo-btn super" data-act="quick-login" data-role="superadmin"><b>👑 Direction Générale <span>(SuperAdmin)</span></b><span>superadmin@caves.bj &rarr;</span></button>' +
+    '<button class="demo-btn gerant" data-act="quick-login" data-role="gerant"><b>🍷 Gérance Sainte-Aurélie <span>(Gérant)</span></b><span>gerant@sainte-aurelie.bj &rarr;</span></button>' +
+    '<button class="demo-btn" data-act="quick-login" data-role="client"><b>🛍️ Client Fidèle <span>(Client)</span></b><span>client@cotonou.bj &rarr;</span></button>' +
+    '</div></div>' +
+    '</div>';
+
+  return { m: statusbar() + mh('Connexion', back('#/')) + '<div class="auth-page">' + cHtml + '</div>', d: '<section class="dw auth-page">' + cHtml + '</section>', nav: 'club', dnav: '', title: 'Connexion — ' + S.name };
+};
+
 /* ---- Compte ---- */
 V.compte = function () {
+  if (!isLogged()) {
+    return V.connexion();
+  }
+  var user = currentUser || MEM;
   var o = lastOrder(), orders = load('orders', []);
   var hist = orders.length ? orders : [o];
   var menu = [['#/suivi', 'Mes commandes'], ['#/favoris', "Ma liste d'envies"], ['#/commande', 'Mes adresses'], ['#/paiement', 'Paiement'], ['#/club', CLUB.name || 'Club Privé'], ['#/journal', 'Le Journal']];
-  var m = statusbar() + mh('Espace Club', null) + '<div class="v acct"><div class="prof"><span class="avatar">' + uimg('avatar', MEM.name) + '</span><div class="pm2"><div class="nb"><b>' + esc(MEM.name) + '</b><span class="tierb">' + esc(String(MEM.tier).toUpperCase()) + '</span></div><span>' + esc(MEM.email) + '</span></div></div>' +
-    '<div class="loyal card"><div class="top"><div><span>Carte de fidélité ' + esc(logo) + '</span><b>Membre Privilège ' + esc(MEM.tier) + '</b></div>' + icon('key', 20, 'c-accent') + '</div><div class="bot"><div><span>Solde des points</span><b>' + num(MEM.points) + ' pts</b></div><a href="#/club">Utiliser mes avantages</a></div></div>' +
+  if (isGerant()) menu.unshift(['#/admin', isSuperAdmin() ? '👑 Console SuperAdmin' : '⚙️ Tableau de bord Gérance']);
+
+  var m = statusbar() + mh('Mon Compte', null) + '<div class="v acct"><div class="prof"><span class="avatar">' + esc(initials(user.name)) + '</span><div class="pm2"><div class="nb"><b>' + esc(user.name) + '</b><span class="tierb">' + esc(String(user.tier || 'OR').toUpperCase()) + '</span></div><span>' + esc(user.email) + '</span></div></div>' +
+    '<div class="loyal card"><div class="top"><div><span>Carte de fidélité ' + esc(logo) + '</span><b>Membre Privilège ' + esc(user.tier || 'Or') + '</b></div>' + icon('key', 20, 'c-accent') + '</div><div class="bot"><div><span>Solde des points</span><b>' + num(user.points || 2450) + ' pts</b></div><a href="#/club">Utiliser mes avantages</a></div></div>' +
     '<a class="clubban" href="#/club">' + uimg('clubBanner', '') + '<b>Accès Éditions Limitées</b><span>Accédez aux allocations exclusives 24h avant tout le monde.</span></a>' +
     '<nav class="menu">' + menu.map(function (x) { return '<a href="' + x[0] + '">' + x[1] + icon('chev-right') + '</a>'; }).join('') + '</nav><div class="signout"><button class="link2" data-act="logout">Se déconnecter</button></div></div>';
+
   var nav = [['#/compte', 'Mon profil', 1], ['#/suivi', 'Mes commandes'], ['#/favoris', 'Mes favoris'], ['#/commande', 'Mes adresses'], ['#/club', 'Mon Club'], ['#/journal', 'Le Journal']];
+  if (isGerant()) nav.unshift(['#/admin', isSuperAdmin() ? '👑 Console SuperAdmin' : '⚙️ Espace Gérant']);
   var total = hist.reduce(function (a, x) { return a + x.total; }, 0);
-  var d = '<section class="dacc"><div class="dw"><aside class="dside"><div class="pf"><span class="av">' + uimg('avatar', MEM.name) + '</span><b>' + esc(MEM.name) + '</b><span class="tierb">Membre ' + esc(MEM.tier) + '</span></div><nav>' + nav.map(function (x) { return '<a href="' + x[0] + '" class="' + (x[2] ? 'on' : '') + '">' + x[1] + icon('chev-right', 12) + '</a>'; }).join('') + '<a href="#/" data-act="logout">Déconnexion</a></nav></aside>' +
-    '<div class="dacont"><div class="tb"><h1>Mon Compte</h1><p>Ravi de vous revoir, ' + esc(String(MEM.name).split(' ')[0]) + '. Gérez vos informations et suivez vos commandes.</p></div>' +
-    '<div class="dgrid g3"><div class="dstat dcard"><span>Total commandes</span><b>' + Math.max(hist.length, 14) + '</b></div><div class="dstat dcard"><span>Montant cumulé</span><b>' + fmt(Math.max(total, 486500)) + '</b></div><div class="dstat dcard"><span>Points fidélité</span><b>' + num(MEM.points) + ' pts</b></div></div>' +
-    '<div class="dibox dcard"><div class="hd"><h3>Informations personnelles</h3><a href="#/commande">Modifier</a></div><div class="flds"><div class="f"><span>Nom complet</span><b>' + esc(MEM.name) + '</b></div><div class="f"><span>Adresse e-mail</span><b>' + esc(MEM.email) + '</b></div><div class="f"><span>Adresse de livraison</span><b>' + esc(MEM.address) + '</b></div><div class="f"><span>Téléphone</span><b>' + esc(MEM.phone) + '</b></div></div></div>' +
+  var d = '<section class="dacc"><div class="dw"><aside class="dside"><div class="pf"><span class="av">' + esc(initials(user.name)) + '</span><b>' + esc(user.name) + '</b><span class="tierb">Membre ' + esc(user.tier || 'Or') + '</span></div><nav>' + nav.map(function (x) { return '<a href="' + x[0] + '" class="' + (x[2] ? 'on' : '') + '">' + x[1] + icon('chev-right', 12) + '</a>'; }).join('') + '<a href="#/" data-act="logout">Déconnexion</a></nav></aside>' +
+    '<div class="dacont"><div class="tb"><h1>Mon Compte</h1><p>Ravi de vous revoir, ' + esc(String(user.name).split(' ')[0]) + '. Gérez vos informations et suivez vos commandes.</p></div>' +
+    '<div class="dgrid g3"><div class="dstat dcard"><span>Total commandes</span><b>' + Math.max(hist.length, 14) + '</b></div><div class="dstat dcard"><span>Montant cumulé</span><b>' + fmt(Math.max(total, 486500)) + '</b></div><div class="dstat dcard"><span>Points fidélité</span><b>' + num(user.points || 2450) + ' pts</b></div></div>' +
+    '<div class="dibox dcard"><div class="hd"><h3>Informations personnelles</h3><a href="#/commande">Modifier</a></div><div class="flds"><div class="f"><span>Nom complet</span><b>' + esc(user.name) + '</b></div><div class="f"><span>Adresse e-mail</span><b>' + esc(user.email) + '</b></div><div class="f"><span>Adresse de livraison</span><b>' + esc(user.address || (S.neighbourhood + ', ' + S.city)) + '</b></div><div class="f"><span>Téléphone</span><b>' + esc(user.phone || '+229 01 00 00 00') + '</b></div></div></div>' +
     '<div class="dibox dcard"><div class="hd"><h3>Commandes récentes</h3><a href="#/suivi">Suivre ma dernière commande</a></div><div class="v" style="gap:16px">' + hist.slice(0, 3).map(function (x, i) { var dd = new Date(x.date); return '<div class="dorow"><div class="l">#' + esc(x.id) + '<span>' + dd.getDate() + ' ' + MOIS[dd.getMonth()] + ' ' + dd.getFullYear() + '</span></div><div class="r"><span>' + fmt(x.total) + '</span><span class="stb ' + (i ? 'done' : 'ship') + '">' + (i ? 'Livrée' : 'En cours') + '</span><a href="#/suivi">Détails</a></div></div>'; }).join('') + '</div></div></div></div></section>';
-  return { m: m, d: d, nav: 'club', dnav: '' };
+  return { m: m, d: d, nav: 'club', dnav: '', title: 'Mon Compte — ' + user.name };
 };
 
 /* ---- Club ---- */
@@ -836,8 +1360,581 @@ V.notfound = function () {
   return { m: m, d: d, nav: '', dnav: '' };
 };
 
+/* =========================== ESPACE GÉRANT & ADMIN =========================== */
+function getAdminOrders() {
+  var orders = load('orders', []);
+  if (!orders || !orders.length) {
+    var p0 = P[0] || { id: 'p0', name: 'Château Margaux', price: 250000 },
+        p1 = P[1] || { id: 'p1', name: 'Veuve Clicquot Brut', price: 48000 },
+        p2 = P[2] || { id: 'p2', name: 'Whisky Macallan 12 ans', price: 65000 };
+    orders = [
+      {
+        id: (S.orderPrefix || 'CMD') + '-857205',
+        date: new Date(Date.now() - 25 * 60e3).toISOString(),
+        status: 'nouvelle',
+        lines: [{ id: p1.id, name: p1.name, sub: p1.sub || 'Champagne', qty: 2, price: p1.price, total: p1.price * 2 }],
+        sub: p1.price * 2,
+        ship: 0,
+        shipLabel: 'Livraison Express (2h)',
+        total: p1.price * 2,
+        c: { name: 'Koffi Mensah', phone: '+229 01 97 45 22 10', zone: 'Haie Vive', address: 'Rue des Palmiers, villa 14' },
+        pay: 'Mobile Money (MTN MoMo)',
+        payType: 'momo',
+        momo: '01 97 45 22 10'
+      },
+      {
+        id: (S.orderPrefix || 'CMD') + '-856940',
+        date: new Date(Date.now() - 140 * 60e3).toISOString(),
+        status: 'livraison',
+        lines: [{ id: p2.id, name: p2.name, sub: p2.sub || 'Single Malt', qty: 1, price: p2.price, total: p2.price }],
+        sub: p2.price,
+        ship: 1500,
+        shipLabel: 'Standard 24h',
+        total: p2.price + 1500,
+        c: { name: 'Aïcha Dossou', phone: '+229 01 66 88 99 00', zone: 'Fidjrossè', address: 'Face pharmacie Akogbato' },
+        pay: 'Paiement à la livraison',
+        payType: 'cod'
+      },
+      {
+        id: (S.orderPrefix || 'CMD') + '-856412',
+        date: new Date(Date.now() - 28 * 3600e3).toISOString(),
+        status: 'livree',
+        lines: [{ id: p0.id, name: p0.name, sub: p0.sub || 'Grand Cru', qty: 1, price: p0.price, total: p0.price }],
+        sub: p0.price,
+        ship: 0,
+        shipLabel: 'Livraison Offerte',
+        total: p0.price,
+        c: { name: 'Dr Patrice Bio', phone: '+229 01 95 12 34 56', zone: 'Ganhi', address: 'Immeuble Horizon, 3e étage' },
+        pay: 'Mobile Money (Celtiis Cash)',
+        payType: 'momo'
+      }
+    ];
+    save('orders', orders);
+  }
+  return orders;
+}
+
+function waClientNotifyLink(o) {
+  var cleanPhone = String(o.c && o.c.phone || '').replace(/\D/g, '');
+  if (!cleanPhone.startsWith('229') && cleanPhone.length === 8) cleanPhone = '229' + cleanPhone;
+  var statusLabels = {
+    nouvelle: 'bien reçue et en attente de validation',
+    confirmee: 'confirmée par notre sommelier',
+    preparation: 'en cours de préparation soignée en cave',
+    livraison: 'confiée à notre livreur et en route vers votre adresse',
+    livree: 'livrée avec succès'
+  };
+  var statusText = statusLabels[o.status] || o.status;
+  var msg = 'Bonjour ' + (o.c && o.c.name ? o.c.name : 'cher client') + ',\nVotre commande #' + o.id + ' chez ' + S.name + ' est ' + statusText + '.\nMontant : ' + fmtTxt(o.total) + '.\nNous restons à votre entière disposition !';
+  return 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg);
+}
+
+function exportOrdersCsv() {
+  var orders = getAdminOrders();
+  var rows = [['ID', 'Date', 'Client', 'Telephone', 'Quartier', 'Articles', 'Sous-total', 'Livraison', 'Total', 'Paiement', 'Statut']];
+  orders.forEach(function (o) {
+    var arts = o.lines.map(function (l) { return l.qty + 'x ' + l.name; }).join('; ');
+    rows.push([o.id, o.date, o.c.name || '', o.c.phone || '', o.c.zone || '', arts, o.sub, o.ship, o.total, o.pay, o.status || 'nouvelle']);
+  });
+  var csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(function (e) {
+    return e.map(function (x) { return '"' + String(x).replace(/"/g, '""') + '"'; }).join(',');
+  }).join('\n');
+  var encodedUri = encodeURI(csvContent);
+  var link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', 'commandes_' + (S.slug || 'cave') + '_' + new Date().toISOString().slice(0, 10) + '.csv');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  toast('Export Excel / CSV téléchargé !');
+}
+
+function openReceiptModal(orderId) {
+  var orders = getAdminOrders();
+  var o = orders.filter(function (x) { return x.id === orderId; })[0] || lastOrder();
+  var modal = document.getElementById('receipt-modal');
+  if (modal) modal.remove();
+  var dd = new Date(o.date);
+  var html = '<div class="receipt-modal-bg" id="receipt-modal">' +
+    '<div class="receipt-paper">' +
+    '<h3>' + esc(S.name) + '</h3>' +
+    '<div class="r-sub">' + esc(S.address || S.neighbourhood) + ' · ' + esc(S.city) + '<br>Tél : ' + esc(S.phone) + '<br>Récépissé de Caisse · N° ' + esc(o.id) + '</div>' +
+    '<div class="r-line"><span>Date :</span><span>' + dd.toLocaleDateString('fr-FR') + ' ' + hm(dd) + '</span></div>' +
+    '<div class="r-line"><span>Client :</span><span>' + esc(o.c.name || 'Client') + '</span></div>' +
+    '<div class="r-line"><span>Tél :</span><span>' + esc(o.c.phone || '-') + '</span></div>' +
+    '<div class="r-line"><span>Quartier :</span><span>' + esc(o.c.zone || S.neighbourhood) + '</span></div>' +
+    '<div class="r-sep"></div>' +
+    o.lines.map(function (l) {
+      return '<div class="r-line"><span>' + l.qty + 'x ' + esc(l.name) + '</span><span>' + fmt(l.total) + '</span></div>';
+    }).join('') +
+    '<div class="r-sep"></div>' +
+    '<div class="r-line"><span>Sous-total :</span><span>' + fmt(o.sub) + '</span></div>' +
+    '<div class="r-line"><span>Livraison (' + esc(o.shipLabel || 'Livraison') + ') :</span><span>' + (o.ship ? fmt(o.ship) : 'Offerte') + '</span></div>' +
+    '<div class="r-line r-tot"><span>TOTAL TTC :</span><span>' + fmt(o.total) + '</span></div>' +
+    '<div class="r-line" style="margin-top:6px;font-size:11px;color:#4b5563"><span>Règlement :</span><span>' + esc(o.pay) + '</span></div>' +
+    '<div class="r-line" style="font-size:11px;color:#4b5563"><span>Statut :</span><span style="font-weight:bold;text-transform:uppercase">' + esc(o.status || 'nouvelle') + '</span></div>' +
+    '<div class="r-sep"></div>' +
+    '<p style="text-align:center;font-size:10px;color:#6b7280;margin:8px 0 0 0">Merci de votre confiance !<br>Conservation climatisée garantie.</p>' +
+    '<div class="receipt-actions">' +
+    '<button class="btn-print" onclick="window.print()">Imprimer</button>' +
+    '<button class="btn-close" data-act="receipt-close">Fermer</button>' +
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+V.admin = function () {
+  if (!isGerant()) {
+    var gate = '<div class="admin-gate-wrap"><div class="admin-gate-card">' +
+      '<div class="admin-gate-icon">🔐</div>' +
+      '<h2>Accès Réservé à la Gérance</h2>' +
+      '<p>Cet espace de pilotage, de gestion des stocks et de suivi des commandes est strictement réservé aux gérants de la cave et à la direction générale.</p>' +
+      '<div class="auth-demo-box" style="margin-top:0;border-top:none;padding-top:0">' +
+      '<p>Connexion rapide avec un compte habilité :</p>' +
+      '<div class="demo-acc-btns">' +
+      '<button class="demo-btn super" data-act="quick-login" data-role="superadmin"><b>👑 Direction Générale <span>(SuperAdmin)</span></b><span>superadmin@caves.bj &rarr;</span></button>' +
+      '<button class="demo-btn gerant" data-act="quick-login" data-role="gerant"><b>🍷 Gérant Sainte-Aurélie <span>(Gérant)</span></b><span>gerant@sainte-aurelie.bj &rarr;</span></button>' +
+      '<button class="demo-btn" data-act="quick-login" data-role="client"><b>🛍️ Client Ordinaire <span>(Client)</span></b><span>Tester le refus d\'accès &rarr;</span></button>' +
+      '</div></div>' +
+      '<div style="margin-top:24px"><a class="btn btn-o" href="#/">← Retourner à la boutique client</a></div>' +
+      '</div></div>';
+    return { m: statusbar() + mh('Accès Restreint', back('#/')) + gate, d: '<section class="dw" style="padding:40px 0">' + gate + '</section>', nav: 'home', dnav: '', title: 'Accès Réservé — Gérance' };
+  }
+
+  var orders = getAdminOrders();
+  var totalRevenue = orders.reduce(function (sum, o) { return sum + (o.total || 0); }, 0);
+  var newOrders = orders.filter(function (o) { return !o.status || o.status === 'nouvelle'; }).length;
+  var inProgress = orders.filter(function (o) { return o.status === 'confirmee' || o.status === 'preparation' || o.status === 'livraison'; }).length;
+  var avgOrder = orders.length ? Math.round(totalRevenue / orders.length) : 0;
+  var lowStockProducts = P.filter(function (p) { return getStock(p) <= 5; });
+  var allUsers = getUsers();
+
+  var kpiCards = '<div class="adm-kpis">' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val">' + orders.length + '</div><div class="adm-kpi-lbl">Total Commandes</div>' + (newOrders ? '<div class="adm-kpi-sub" style="color:var(--accent)">' + newOrders + ' nouvelle(s)</div>' : '<div class="adm-kpi-sub">À jour</div>') + '</div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val gold">' + fmt(totalRevenue) + '</div><div class="adm-kpi-lbl">Chiffre d\'Affaires Cumulé</div><div class="adm-kpi-sub">Commandes de la cave</div></div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val">' + fmt(avgOrder) + '</div><div class="adm-kpi-lbl">Panier Moyen</div><div class="adm-kpi-sub">Par client</div></div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val" style="color:' + (lowStockProducts.length ? 'var(--warning)' : 'var(--success)') + '">' + lowStockProducts.length + '</div><div class="adm-kpi-lbl">Alertes Ruptures</div><div class="adm-kpi-sub">' + (lowStockProducts.length ? 'Flacons &le; 5 en stock' : 'Stocks confortables') + '</div></div>' +
+    '</div>';
+
+  var tabsNav = '<div class="adm-nav-tabs">' +
+    '<button class="adm-tab-btn' + (admTab === 'orders' ? ' on' : '') + '" data-act="adm-tab" data-v="orders">📦 Commandes en direct (' + orders.length + ')</button>' +
+    '<button class="adm-tab-btn' + (admTab === 'stock' ? ' on' : '') + '" data-act="adm-tab" data-v="stock">🍷 Gestion des Stocks (' + P.length + ' réf.)' + (lowStockProducts.length ? ' <span style="color:var(--warning)">⚠️</span>' : '') + '</button>' +
+    '<button class="adm-tab-btn' + (admTab === 'stats' ? ' on' : '') + '" data-act="adm-tab" data-v="stats">📊 Ventes &amp; Statistiques</button>' +
+    '<button class="adm-tab-btn' + (admTab === 'tenant' ? ' on' : '') + '" data-act="adm-tab" data-v="tenant">🏢 Multi-Caves &amp; Réglages</button>' +
+    (isSuperAdmin() ? '<button class="adm-tab-btn' + (admTab === 'superadmin' ? ' on' : '') + '" data-act="adm-tab" data-v="superadmin" style="color:#f59e0b">👑 SuperAdmin · Utilisateurs (' + allUsers.length + ')</button>' : '') +
+    '</div>';
+
+  var ordersTable = '<div class="adm-table-wrap"><table class="adm-table">' +
+    '<thead><tr><th>N° Commande</th><th>Date</th><th>Client</th><th>Flacons</th><th>Total &amp; Paiement</th><th>Statut</th><th>Actions</th></tr></thead>' +
+    '<tbody>' +
+    orders.map(function (o) {
+      var d = new Date(o.date);
+      var curSt = o.status || 'nouvelle';
+      var linesStr = o.lines.map(function (l) { return l.qty + 'x ' + esc(l.name); }).join('<br>');
+      return '<tr>' +
+        '<td><b>#' + esc(o.id) + '</b></td>' +
+        '<td>' + d.getDate() + ' ' + MOIS[d.getMonth()] + '<br><small style="color:var(--muted)">' + hm(d) + '</small></td>' +
+        '<td><b>' + esc((o.c && o.c.name) || 'Client') + '</b><br><small style="color:var(--muted)">' + esc((o.c && o.c.phone) || '-') + '<br>' + esc((o.c && o.c.zone) || S.neighbourhood) + '</small></td>' +
+        '<td><div style="font-size:12px;max-width:200px">' + linesStr + '</div></td>' +
+        '<td><b class="gold">' + fmt(o.total) + '</b><br><small style="color:var(--muted)">' + esc(o.pay) + '</small></td>' +
+        '<td>' +
+        '<select class="adm-status-select" data-act="adm-st-change" data-id="' + esc(o.id) + '" aria-label="Statut commande">' +
+        ['nouvelle', 'confirmee', 'preparation', 'livraison', 'livree'].map(function (st) {
+          var lbl = { nouvelle: 'Nouvelle', confirmee: 'Confirmée', preparation: 'Préparation', livraison: 'En livraison', livree: 'Livrée' }[st];
+          return '<option value="' + st + '"' + (curSt === st ? ' selected' : '') + '>' + lbl + '</option>';
+        }).join('') +
+        '</select>' +
+        '<span class="adm-status-chip ' + curSt + '" style="margin-top:4px">' + curSt + '</span>' +
+        '</td>' +
+        '<td>' +
+        '<a class="act-btn wa" href="' + waClientNotifyLink(o) + '" target="_blank" rel="noopener" title="Notifier sur WhatsApp">' + icon('whatsapp', 13) + ' WhatsApp</a>' +
+        '<button class="act-btn" data-act="adm-receipt" data-id="' + esc(o.id) + '" title="Imprimer le reçu">' + icon('pin', 12) + ' Reçu</button>' +
+        '</td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table></div>';
+
+  var ordersPanel = '<div class="adm-panel' + (admTab === 'orders' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Gestion des Commandes</h3><p>Suivi en temps réel des commandes passées via la boutique.</p></div>' +
+    '<div class="adm-ph-actions"><button class="adm-btn gold" data-act="adm-export">' + icon('check', 14) + ' Exporter Excel / CSV</button></div></div>' +
+    ordersTable +
+    '</div>';
+
+  var stockAlertBanner = lowStockProducts.length ?
+    '<div class="adm-alert-box">' + icon('shield', 20) + '<div><b>Alerte stock bas détectée :</b> ' + lowStockProducts.length + ' référence(s) ont 5 bouteilles ou moins restantes en cave. Pensez à réapprovisionner auprès de vos distributeurs.</div></div>' : '';
+
+  var stockTable = '<div class="adm-table-wrap"><table class="adm-table">' +
+    '<thead><tr><th>Flacon</th><th>Catégorie</th><th>Prix Vente</th><th>En Réserve</th><th>État</th><th>Ajuster Stock</th></tr></thead>' +
+    '<tbody>' +
+    P.map(function (p) {
+      var qty = getStock(p);
+      var stateChip = qty === 0 ? '<span class="adm-status-chip" style="background:rgba(239,68,68,.2);color:#ef4444;border-color:rgba(239,68,68,.4)">Rupture</span>' :
+        qty <= 5 ? '<span class="adm-status-chip" style="background:rgba(217,119,6,.2);color:#f59e0b;border-color:rgba(217,119,6,.4)">Faible (&le;5)</span>' :
+        '<span class="adm-status-chip livree">Disponible</span>';
+      return '<tr>' +
+        '<td><div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="width:36px;height:44px;border-radius:4px;overflow:hidden;background:#1a1a1c;flex:none">' + pimg(p) + '</div>' +
+        '<div><b>' + esc(p.name) + '</b><br><small style="color:var(--muted)">' + esc(p.sub || p.region || '') + '</small></div></div></td>' +
+        '<td><span class="chip g" style="font-size:11px">' + esc((CAT[p.category] || {}).label || p.category) + '</span></td>' +
+        '<td><b class="gold">' + fmt(p.price) + '</b></td>' +
+        '<td><b style="font-size:15px;' + (qty <= 5 ? 'color:#f59e0b' : '') + '">' + qty + ' btl</b></td>' +
+        '<td>' + stateChip + '</td>' +
+        '<td><div style="display:flex;gap:4px">' +
+        '<button class="act-btn" data-act="adm-stock" data-id="' + esc(p.id) + '" data-d="-1" title="Décrémenter stock">-1</button>' +
+        '<button class="act-btn" data-act="adm-stock" data-id="' + esc(p.id) + '" data-d="1" title="Incrémenter stock">+1</button>' +
+        '<button class="act-btn" data-act="adm-stock" data-id="' + esc(p.id) + '" data-d="6" title="Ajouter un carton (+6)">+6 (Carton)</button>' +
+        '</div></td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table></div>';
+
+  var stockPanel = '<div class="adm-panel' + (admTab === 'stock' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Inventaire &amp; Réserves en Cave</h3><p>Alertes automatiques et gestion unitaire des bouteilles en rayon et en réserve.</p></div></div>' +
+    stockAlertBanner +
+    stockTable +
+    '</div>';
+
+  var topSales = P.slice(0, 5);
+  var statsPanel = '<div class="adm-panel' + (admTab === 'stats' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Performance Commerciale &amp; Statistiques</h3><p>Métriques de vente calculées sur l\'activité de ' + esc(S.name) + '.</p></div></div>' +
+    '<div class="dgrid g3" style="margin-bottom:24px">' +
+    '<div class="dcard"><h4>Chiffre du Jour</h4><b class="gold" style="font-size:24px">' + fmt(Math.round(totalRevenue * 0.42)) + '</b><p style="font-size:12px;color:var(--muted)">Estimation sur les commandes de la journée</p></div>' +
+    '<div class="dcard"><h4>Chiffre du Mois</h4><b class="gold" style="font-size:24px">' + fmt(Math.round(totalRevenue * 2.85)) + '</b><p style="font-size:12px;color:var(--muted)">Projection mensuelle consolidée</p></div>' +
+    '<div class="dcard"><h4>Heures de Pointe</h4><b style="font-size:20px">17h00 — 21h30</b><p style="font-size:12px;color:var(--muted)">Pic de commandes : Vendredi &amp; Samedi soir</p></div>' +
+    '</div>' +
+    '<div class="dcard" style="padding:20px;margin-bottom:24px">' +
+    '<h4 style="margin:0 0 16px 0">Top 5 des Flacons les Plus Demandés</h4>' +
+    topSales.map(function (p, i) {
+      var pct = [92, 78, 64, 48, 35][i] || 30;
+      return '<div style="margin-bottom:12px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">' +
+        '<span><b>#' + (i + 1) + ' ' + esc(p.name) + '</b> (' + esc((CAT[p.category] || {}).label || p.category) + ')</span>' +
+        '<span class="gold"><b>' + fmt(p.price) + '</b></span>' +
+        '</div>' +
+        '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:var(--accent);border-radius:3px"></div>' +
+        '</div></div>';
+    }).join('') +
+    '</div></div>';
+
+  var tenantPanel = '<div class="adm-panel' + (admTab === 'tenant' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Architecture Multi-Caves (Multi-Tenant)</h3><p>Chaque cave de Cotonou dispose de son propre espace de données cloisonné.</p></div></div>' +
+    '<div class="dgrid g2" style="margin-bottom:24px">' +
+    '<div class="dcard">' +
+    '<h4>Cave Active</h4>' +
+    '<p><b style="font-size:16px">' + esc(S.name) + '</b><br><span style="color:var(--muted)">' + esc(S.neighbourhood) + ', ' + esc(S.city) + '<br>' + esc(S.address) + '</span></p>' +
+    '<p style="font-size:12px;color:var(--muted)">Clé de stockage isolé : <code style="color:var(--accent);background:rgba(0,0,0,.4);padding:2px 6px;border-radius:3px">' + esc(KEY) + '</code></p>' +
+    '<p style="font-size:12px">WhatsApp officiel configuré : <b>+' + esc(S.whatsapp) + '</b></p>' +
+    '</div>' +
+    '<div class="dcard">' +
+    '<h4>Accès Rapide aux 10 Caves de Démo</h4>' +
+    '<p style="font-size:12px;color:var(--muted)">Basculez vers l\'une des autres caves pour vérifier la séparation complète des données :</p>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    CAVES_DATA.map(function (c) {
+      return '<a class="chip' + (c.slug === S.slug ? ' on' : '') + '" href="' + c.url + '#/admin" style="font-size:11px">' + esc(c.name) + '</a>';
+    }).join('') +
+    '</div></div></div></div>';
+
+  var superadminPanel = '';
+  if (isSuperAdmin()) {
+    superadminPanel = '<div class="adm-panel' + (admTab === 'superadmin' ? ' on' : '') + '">' +
+      '<div class="adm-panel-head">' +
+      '<div class="adm-ph-tx"><h3>Console SuperAdmin · Gestion des Admins &amp; Rôles</h3><p>Gérez les droits d\'accès, attribuez des rôles d\'administrateurs ou gérants, et configurez les caves.</p></div>' +
+      '</div>' +
+      '<div class="adm-super-grid">' +
+      '<div class="dcard" style="padding:20px">' +
+      '<h4 style="margin:0 0 14px 0">Comptes Utilisateurs Enregistrés (' + allUsers.length + ')</h4>' +
+      '<div class="adm-table-wrap"><table class="adm-table">' +
+      '<thead><tr><th>Utilisateur</th><th>Email &amp; Tél</th><th>Rôle Actuel</th><th>Cave</th><th>Actions</th></tr></thead>' +
+      '<tbody>' +
+      allUsers.map(function (u) {
+        var isSelf = currentUser && currentUser.id === u.id;
+        return '<tr>' +
+          '<td><div style="display:flex;align-items:center;gap:10px">' +
+          '<div class="adm-user-avatar">' + esc(initials(u.name)) + '</div>' +
+          '<div><b>' + esc(u.name) + '</b>' + (isSelf ? ' <small style="color:var(--accent)">(Vous)</small>' : '') + '</div></div></td>' +
+          '<td>' + esc(u.email) + '<br><small style="color:var(--muted)">' + esc(u.phone || '-') + '</small></td>' +
+          '<td><span class="adm-role-badge ' + esc(u.role) + '">' + esc(u.role) + '</span></td>' +
+          '<td><small>' + esc(u.caveSlug === 'all' ? 'Toutes les caves' : u.caveSlug) + '</small></td>' +
+          '<td><div style="display:flex;gap:4px;flex-wrap:wrap">' +
+          (u.role !== 'gerant' ? '<button class="act-btn" data-act="set-user-role" data-id="' + esc(u.id) + '" data-role="gerant" title="Promouvoir Gérant">Gérant</button>' : '') +
+          (u.role !== 'superadmin' ? '<button class="act-btn" data-act="set-user-role" data-id="' + esc(u.id) + '" data-role="superadmin" title="Promouvoir SuperAdmin">SuperAdmin</button>' : '') +
+          (u.role !== 'client' ? '<button class="act-btn" data-act="set-user-role" data-id="' + esc(u.id) + '" data-role="client" title="Passer Client">Client</button>' : '') +
+          (!isSelf ? '<button class="act-btn" style="color:#ef4444;border-color:rgba(239,68,68,.3)" data-act="del-user" data-id="' + esc(u.id) + '" title="Supprimer">✕</button>' : '') +
+          '</div></td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div></div>' +
+      '<div class="dcard" style="padding:20px">' +
+      '<h4 style="margin:0 0 14px 0">Créer un Nouvel Administrateur / Gérant</h4>' +
+      '<form data-form="add-admin-form">' +
+      '<div class="auth-fld"><label>Nom &amp; Prénom</label><input type="text" id="new-user-name" placeholder="ex: Marc Agossa" required></div>' +
+      '<div class="auth-fld"><label>Adresse e-mail</label><input type="email" id="new-user-email" placeholder="ex: marc@caves.bj" required></div>' +
+      '<div class="auth-fld"><label>Téléphone</label><input type="tel" id="new-user-phone" placeholder="+229 01 00 00 00" required></div>' +
+      '<div class="auth-fld"><label>Rôle à attribuer</label>' +
+      '<select id="new-user-role"><option value="gerant">Gérant de Cave</option><option value="superadmin">SuperAdmin (Direction)</option><option value="client">Client</option></select>' +
+      '</div>' +
+      '<div class="auth-fld"><label>Cave Assignée</label>' +
+      '<select id="new-user-cave">' +
+      '<option value="' + esc(S.slug) + '">' + esc(S.name) + ' (Actuelle)</option>' +
+      CAVES_DATA.map(function (c) { return '<option value="' + esc(c.slug) + '">' + esc(c.name) + '</option>'; }).join('') +
+      '<option value="all">Toutes les caves (Global)</option>' +
+      '</select></div>' +
+      '<button type="submit" class="auth-btn-submit" style="margin-top:12px">+ Créer l\'accès</button>' +
+      '</form></div></div></div>';
+  }
+
+  var content = '<div class="adm-wrap">' +
+    '<div class="adm-header">' +
+    '<div class="adm-title-group">' +
+    '<span class="adm-badge">' + (isSuperAdmin() ? '👑 Console SuperAdmin' : 'Espace Administration &amp; Gérance') + '</span>' +
+    '<h2>' + esc(S.name) + '</h2>' +
+    '<p style="color:var(--muted);font-size:13px;margin:2px 0 0 0">Connecté en tant que <b>' + esc(currentUser.name) + '</b> (' + esc(currentUser.role) + ') · Données cloisonnées en temps réel</p>' +
+    '</div>' +
+    '<div class="adm-actions-top">' +
+    '<a class="adm-btn" href="#/">← Retour Boutique Client</a>' +
+    '<button class="adm-btn gold" data-act="adm-export">' + icon('check', 14) + ' Export Données</button>' +
+    '</div></div>' +
+    kpiCards +
+    tabsNav +
+    ordersPanel +
+    stockPanel +
+    statsPanel +
+    tenantPanel +
+    superadminPanel +
+    '</div>';
+
+  var mHeader = statusbar() + mh('Espace Gérance', back('#/'),
+    '<div style="display:flex;align-items:center;gap:6px">' +
+    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème">' + themeSunMoonSvg() + '</button>' +
+    menuBtn() + '</div>'
+  );
+  return { m: mHeader + content, d: '<section class="dw" style="padding-top:24px;padding-bottom:60px">' + content + '</section>', nav: 'home', dnav: '', title: 'Tableau de bord Gérant — ' + S.name };
+};
+
+/* =========================== INITIALISATEURS DYNAMIQUES =========================== */
+function initInteractiveMap() {
+  var mapEl = document.getElementById('cave-leaflet-map');
+  if (!mapEl) return;
+  if (typeof window.maplibregl === 'undefined') {
+    console.warn('MapLibre GL non chargé');
+    return;
+  }
+
+  var cur = CAVES_DATA.filter(function (c) { return c.slug === S.slug; })[0] || CAVES_DATA[0];
+
+  if (window._activeCaveMap) {
+    try { window._activeCaveMap.remove(); } catch (e) {}
+    window._activeCaveMap = null;
+  }
+
+  try {
+    var center = mapFilter === 'all' ? [2.395, 6.363] : [cur.lng, cur.lat];
+    var zoom = mapFilter === 'all' ? 11.5 : 13.8;
+
+    var map = new maplibregl.Map({
+      container: mapEl,
+      style: {
+        version: 8,
+        sources: {
+          'osm-tiles': {
+            type: 'raster',
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }
+        },
+        layers: [
+          {
+            id: 'osm-tiles-layer',
+            type: 'raster',
+            source: 'osm-tiles',
+            minzoom: 0,
+            maxzoom: 19
+          }
+        ]
+      },
+      center: center,
+      zoom: zoom,
+      scrollZoom: false
+    });
+    window._activeCaveMap = map;
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+    map.on('load', function () {
+      CAVES_DATA.forEach(function (c) {
+        var isCur = c.slug === S.slug;
+        if (mapFilter === 'current' && !isCur) return;
+
+        var el = document.createElement('div');
+        el.className = 'custom-map-pin' + (isCur ? ' current' : '');
+        el.innerHTML = isCur
+          ? '<div class="pin-pulse"></div><div class="pin-dot current">🍷</div>'
+          : '<div class="pin-dot">🍾</div>';
+
+        var itLink = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.name + ' ' + c.neighbourhood + ' Cotonou');
+        var waDirect = 'https://wa.me/' + c.whatsapp + '?text=' + encodeURIComponent('Bonjour ' + c.name + ', je prépare mon passage à la cave.');
+
+        var popupHtml = '<div class="map-popup-inner">' +
+          '<h4>' + esc(c.name) + '</h4>' +
+          '<p class="pop-addr">' + esc(c.address) + '</p>' +
+          '<p class="pop-tel">Tél : ' + esc(c.phone) + '</p>' +
+          '<div class="pop-btns">' +
+          '<a class="pop-btn-it" href="' + esc(itLink) + '" target="_blank" rel="noopener">🗺️ Itinéraire</a>' +
+          '<a class="pop-btn-wa" href="' + esc(waDirect) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' +
+          (!isCur ? '<a class="pop-btn-visit" href="' + c.url + '">Visiter la boutique</a>' : '') +
+          '</div></div>';
+
+        var popup = new maplibregl.Popup({ offset: 24, closeButton: true })
+          .setHTML(popupHtml);
+
+        new maplibregl.Marker({ element: el })
+          .setLngLat([c.lng, c.lat])
+          .setPopup(popup)
+          .addTo(map);
+      });
+    });
+
+    setTimeout(function () { map.resize(); }, 350);
+  } catch (err) {
+    console.warn('MapLibre map error:', err);
+  }
+}
+
+function initCounters() {
+  var counters = document.querySelectorAll('[data-counter]');
+  if (!counters.length) return;
+
+  if (!('IntersectionObserver' in window)) {
+    counters.forEach(function (el) {
+      var target = +el.getAttribute('data-counter');
+      var pre = el.getAttribute('data-prefix') || '';
+      var suf = el.getAttribute('data-suffix') || '';
+      el.textContent = pre + target + suf;
+    });
+    return;
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        var el = entry.target;
+        observer.unobserve(el);
+        var target = +el.getAttribute('data-counter');
+        var pre = el.getAttribute('data-prefix') || '';
+        var suf = el.getAttribute('data-suffix') || '';
+        var duration = 1200;
+        var startTime = null;
+
+        function step(timestamp) {
+          if (!startTime) startTime = timestamp;
+          var progress = Math.min((timestamp - startTime) / duration, 1);
+          var current = Math.floor(progress * target);
+          el.textContent = pre + current + suf;
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else {
+            el.textContent = pre + target + suf;
+          }
+        }
+        requestAnimationFrame(step);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  counters.forEach(function (c) { observer.observe(c); });
+}
+
+function initScrollReveals() {
+  var reveals = document.querySelectorAll('.reveal-on-scroll');
+  reveals.forEach(function (el) {
+    el.classList.add('is-visible');
+    el.classList.add('is-revealed');
+  });
+}
+
+/* ---------- Carrousel d'Avis Défilement Automatique sur Mobile ---------- */
+var revInterval = null;
+var currentRevIdx = 0;
+
+function updateRevDots(idx) {
+  var dots = document.querySelectorAll('.rev-dot');
+  dots.forEach(function (d, i) {
+    d.classList.toggle('on', i === idx);
+  });
+}
+
+function stepReviews(direction) {
+  var grid = document.getElementById('reviewsGrid');
+  if (!grid) return;
+  var cards = grid.querySelectorAll('.rev-card');
+  if (!cards.length) return;
+  currentRevIdx = (currentRevIdx + direction + cards.length) % cards.length;
+  var targetCard = cards[currentRevIdx];
+  if (targetCard) {
+    grid.scrollTo({
+      left: targetCard.offsetLeft - 20,
+      behavior: 'smooth'
+    });
+    updateRevDots(currentRevIdx);
+  }
+}
+
+function initReviewsSlider() {
+  if (revInterval) {
+    clearInterval(revInterval);
+    revInterval = null;
+  }
+  var grid = document.getElementById('reviewsGrid');
+  if (!grid) return;
+
+  if (window.innerWidth < 1024) {
+    revInterval = setInterval(function () {
+      if (document.hidden || grid._touch || grid._hover) return;
+      stepReviews(1);
+    }, 4500);
+
+    grid.addEventListener('touchstart', function () { grid._touch = true; }, { passive: true });
+    grid.addEventListener('touchend', function () { grid._touch = false; }, { passive: true });
+    grid.addEventListener('mouseenter', function () { grid._hover = true; });
+    grid.addEventListener('mouseleave', function () { grid._hover = false; });
+  }
+}
+
+/* ---------- Bulle WhatsApp Fermable avec Disparition 30s ---------- */
+var waTimer = null;
+function initFloatingWhatsApp() {
+  var bubble = document.getElementById('fwaBubble');
+  if (!bubble) return;
+  if (waTimer) {
+    clearTimeout(waTimer);
+    waTimer = null;
+  }
+
+  var closed = false;
+  try { closed = sessionStorage.getItem('wa_bubble_closed') === '1'; } catch (e) {}
+  if (closed) {
+    bubble.classList.add('fwa-hidden');
+    return;
+  }
+
+  // Disparaît automatiquement après 30 secondes
+  waTimer = setTimeout(function () {
+    if (bubble) bubble.classList.add('fwa-hidden');
+  }, 30000);
+}
+
+function dismissWhatsAppBubble() {
+  var bubble = document.getElementById('fwaBubble');
+  if (bubble) bubble.classList.add('fwa-hidden');
+  try { sessionStorage.setItem('wa_bubble_closed', '1'); } catch (e) {}
+  if (waTimer) clearTimeout(waTimer);
+}
+
 /* =========================== routeur & rendu =========================== */
-var ROUTES = { '': 'home', catalogue: 'catalogue', categorie: 'categorie', vins: 'vins', services: 'services', filtres: 'filtres', recherche: 'recherche', produit: 'produit', favoris: 'favoris', panier: 'panier', commande: 'commande', paiement: 'paiement', confirmation: 'confirmation', suivi: 'suivi', compte: 'compte', club: 'club', journal: 'journal' };
+var ROUTES = { '': 'home', catalogue: 'catalogue', categorie: 'categorie', vins: 'vins', services: 'services', filtres: 'filtres', recherche: 'recherche', produit: 'produit', favoris: 'favoris', panier: 'panier', commande: 'commande', paiement: 'paiement', confirmation: 'confirmation', suivi: 'suivi', compte: 'compte', club: 'club', journal: 'journal', admin: 'admin', connexion: 'connexion' };
 function parse() {
   var h = location.hash.replace(/^#\/?/, ''), qi = h.indexOf('?'), q = {};
   if (qi >= 0) { h.slice(qi + 1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || '').replace(/\+/g, ' ')); }); h = h.slice(0, qi); }
@@ -849,13 +1946,18 @@ function render(keepScroll) {
   var r = parse(), view = r.name ? V[r.name] : V.notfound;
   var v = (view || V.notfound)(r.args, r.q);
   var y = window.scrollY;
-  app.innerHTML = dHeader(v.dnav) + '<main><div class="m-only"><div class="screen' + (v.noNav ? ' no-nav' : '') + '">' + v.m + '</div></div><div class="d-only">' + v.d + '</div></main>' + dFooter() + (v.noNav ? '' : bottomNav(v.nav)) + drawer() + ageGate();
+  app.innerHTML = dHeader(v.dnav) + '<main><div class="m-only"><div class="screen' + (v.noNav ? ' no-nav' : '') + '">' + v.m + '</div></div><div class="d-only">' + v.d + '</div></main>' + dFooter() + (v.noNav ? '' : bottomNav(v.nav)) + drawer() + ageGate() + floatingWhatsappHtml();
   document.body.classList.toggle('hide-bn', !!v.noNav);
   document.title = (v.title ? v.title + ' — ' : '') + S.name;
   var key = location.hash.split('?')[0];
   if (keepScroll && key === lastKey) window.scrollTo(0, y); else window.scrollTo(0, 0);
   lastKey = key;
   initCarousels();
+  initInteractiveMap();
+  initCounters();
+  initScrollReveals();
+  initReviewsSlider();
+  initFloatingWhatsApp();
 }
 
 /* ---------- vérification d'âge ---------- */
@@ -893,7 +1995,10 @@ document.addEventListener('click', function (e) {
     case 'order': {
       if (!ck.name || !ck.phone) { toast('Merci d\'indiquer votre nom et votre téléphone'); if (location.hash.indexOf('paiement') >= 0 && window.innerWidth < 1024) location.hash = '#/commande'; return; }
       var o = makeOrder(), url = waLink(orderText(o));
-      save('order', o); var hist = load('orders', []); hist.unshift(o); save('orders', hist.slice(0, 10));
+      save('order', o);
+      var hist = getAdminOrders();
+      hist.unshift(o);
+      save('orders', hist.slice(0, 25));
       cart = []; ck.giftMsg = ''; ck.gift = false; persist();
       window.open(url, '_blank', 'noopener');
       location.hash = '#/confirmation'; return;
@@ -909,9 +2014,67 @@ document.addEventListener('click', function (e) {
     case 'cmore': catState.shown += 8; rerender(); return;
     case 'q': F.q = el.getAttribute('data-v'); persist(); rerender(); return;
     case 'unrecent': recent.splice(+el.getAttribute('data-i'), 1); persist(); rerender(); return;
-    case 'logout': e.preventDefault(); toast('Démo : la connexion client n\'est pas activée'); return;
+    case 'logout': e.preventDefault(); logoutUser(); return;
+    case 'toggle-theme': e.preventDefault(); toggleTheme(); return;
+    case 'set-theme': e.preventDefault(); setTheme(el.getAttribute('data-v')); return;
+    case 'auth-tab': save('auth_tab', el.getAttribute('data-v')); rerender(); return;
+    case 'quick-login': {
+      var role = el.getAttribute('data-role');
+      var users = getUsers();
+      var match = users.filter(function (u) { return u.role === role; })[0];
+      if (!match) match = DEFAULT_USERS.filter(function (u) { return u.role === role; })[0] || DEFAULT_USERS[2];
+      loginAs(match);
+      if (role === 'superadmin' || role === 'gerant') location.hash = '#/admin';
+      else location.hash = '#/compte';
+      return;
+    }
+    case 'set-user-role': {
+      var uid = el.getAttribute('data-id'), nrole = el.getAttribute('data-role');
+      updateUserRole(uid, nrole);
+      toast('Rôle mis à jour : ' + nrole);
+      rerender();
+      return;
+    }
+    case 'del-user': {
+      var uid2 = el.getAttribute('data-id');
+      if (confirm('Supprimer cet utilisateur ?')) {
+        deleteUser(uid2);
+        toast('Utilisateur supprimé');
+        rerender();
+      }
+      return;
+    }
     case 'age-yes': save('age', true); save('ageNo', false); var g = document.querySelector('.age'); if (g) g.remove(); return;
     case 'age-no': save('ageNo', true); document.querySelector('.age').classList.add('refused'); return;
+    case 'hl-tab': {
+      hlTab = el.getAttribute('data-v');
+      var hlSec = el.closest('.home-highlights');
+      if (hlSec) {
+        hlSec.querySelectorAll('.hl-tab').forEach(function (b) {
+          b.classList.toggle('on', b.getAttribute('data-v') === hlTab);
+        });
+        var isD = hlSec.classList.contains('dw');
+        var bestsellers = P.filter(function (p) { return p.featured; });
+        if (bestsellers.length < 4) bestsellers = P.slice(0, 4);
+        var news = P.filter(function (p) { return p.year && p.year >= 2019 && !p.featured; });
+        if (news.length < 4) news = P.slice(4, 8);
+        var activeList = hlTab === 'bestsellers' ? bestsellers : news;
+        var newItems = isD ? activeList.slice(0, 4).map(function (p) { return dpcard(p); }).join('') : activeList.slice(0, 4).map(pcard).join('');
+        var grid = hlSec.querySelector('.hl-grid');
+        if (grid) grid.innerHTML = newItems;
+      }
+      return;
+    }
+    case 'rev-prev': stepReviews(-1); return;
+    case 'rev-next': stepReviews(1); return;
+    case 'faq-tog': { var fi = +el.getAttribute('data-i'); faqOpen[fi] = !faqOpen[fi]; rerender(); return; }
+    case 'map-filter': { mapFilter = el.getAttribute('data-v'); rerender(); return; }
+    case 'fwa-dismiss': dismissWhatsAppBubble(); return;
+    case 'adm-tab': admTab = el.getAttribute('data-v'); rerender(); return;
+    case 'adm-stock': setStock(el.getAttribute('data-id'), +el.getAttribute('data-d')); rerender(); return;
+    case 'adm-receipt': openReceiptModal(el.getAttribute('data-id')); return;
+    case 'receipt-close': { var rm = document.getElementById('receipt-modal'); if (rm) rm.remove(); return; }
+    case 'adm-export': exportOrdersCsv(); return;
   }
 });
 var qt;
@@ -940,18 +2103,112 @@ document.addEventListener('input', function (e) {
   if (k === 'sort') { F.sort = v; persist(); rerender(); return; }
   if (k in ck) { ck[k] = v; persist(); document.querySelectorAll('[data-in="' + k + '"]').forEach(function (o) { if (o !== el) o.value = v; }); }
 });
-document.addEventListener('change', function (e) { var el = e.target; if (el.getAttribute && el.getAttribute('data-in') === 'zone') { ck.zone = el.value; persist(); } if (el.getAttribute && el.getAttribute('data-in') === 'sort') { F.sort = el.value; persist(); rerender(); } });
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.getAttribute && el.getAttribute('data-in') === 'zone') { ck.zone = el.value; persist(); }
+  if (el.getAttribute && el.getAttribute('data-in') === 'sort') { F.sort = el.value; persist(); rerender(); }
+  if (el.getAttribute && el.getAttribute('data-act') === 'adm-st-change') {
+    var oid = el.getAttribute('data-id'), nst = el.value;
+    var allO = getAdminOrders();
+    allO.forEach(function (x) { if (x.id === oid) x.status = nst; });
+    save('orders', allO);
+    toast('Statut commande mis à jour : ' + nst);
+    rerender();
+  }
+});
 document.addEventListener('keydown', function (e) {
   var el = e.target;
   if (e.key === 'Enter' && el.getAttribute && /^(q|sq|dq)$/.test(el.getAttribute('data-in') || '') && el.value.trim()) {
     var v = el.value.trim(); recent = [v].concat(recent.filter(function (x) { return x !== v; })).slice(0, 5); persist(); el.blur();
   }
-  if (e.key === 'Escape' && drawerOpen) { drawerOpen = false; document.getElementById('drawer').classList.remove('open'); }
+  if (e.key === 'Escape') {
+    if (drawerOpen) { drawerOpen = false; document.getElementById('drawer').classList.remove('open'); }
+    var rm = document.getElementById('receipt-modal'); if (rm) rm.remove();
+  }
 });
 document.addEventListener('submit', function (e) {
-  if (e.target.getAttribute('data-form') === 'news') { e.preventDefault(); window.open(waLink('Bonjour, je souhaite recevoir vos nouveaux arrivages sur WhatsApp.'), '_blank', 'noopener'); }
+  var formType = e.target.getAttribute('data-form');
+  if (formType === 'news') {
+    e.preventDefault();
+    window.open(waLink('Bonjour, je souhaite recevoir vos nouveaux arrivages sur WhatsApp.'), '_blank', 'noopener');
+  }
+  if (formType === 'auth-login') {
+    e.preventDefault();
+    var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
+    var users = getUsers();
+    var u = users.filter(function (x) { return x.email.toLowerCase() === email; })[0];
+    if (!u) {
+      u = addUser(email.split('@')[0], email, 'client', '+229 01 00 00 00', S.slug);
+    }
+    loginAs(u);
+    if (u.role === 'superadmin' || u.role === 'gerant') location.hash = '#/admin';
+    else location.hash = '#/compte';
+  }
+  if (formType === 'auth-register') {
+    e.preventDefault();
+    var rname = (document.getElementById('reg-name').value || '').trim();
+    var remail = (document.getElementById('reg-email').value || '').trim().toLowerCase();
+    var rphone = (document.getElementById('reg-phone').value || '').trim();
+    var nu = addUser(rname, remail, 'client', rphone, S.slug);
+    loginAs(nu);
+    location.hash = '#/compte';
+  }
+  if (formType === 'add-admin-form') {
+    e.preventDefault();
+    var nName = (document.getElementById('new-user-name').value || '').trim();
+    var nEmail = (document.getElementById('new-user-email').value || '').trim().toLowerCase();
+    var nPhone = (document.getElementById('new-user-phone').value || '').trim();
+    var nRole = document.getElementById('new-user-role').value;
+    var nCave = document.getElementById('new-user-cave').value;
+    addUser(nName, nEmail, nRole, nPhone, nCave);
+    toast('Accès ' + nRole + ' créé avec succès');
+    rerender();
+  }
 });
+
+/* ---------- Smart Navbar (masquage au défilement vers le bas, réapparition au scroll haut) ---------- */
+var lastScrollY = window.pageYOffset || document.documentElement.scrollTop;
+var navTicking = false;
+window.addEventListener('scroll', function () {
+  if (!navTicking) {
+    window.requestAnimationFrame(function () {
+      var currentScrollY = window.pageYOffset || document.documentElement.scrollTop;
+      var dh = document.querySelector('.dh');
+      var sh = document.querySelector('.sh');
+      var diff = currentScrollY - lastScrollY;
+
+      // Effet verre dépoli / ombre au défilement
+      if (currentScrollY > 15) {
+        if (dh) dh.classList.add('nav-scrolled');
+        if (sh) sh.classList.add('nav-scrolled');
+      } else {
+        if (dh) dh.classList.remove('nav-scrolled');
+        if (sh) sh.classList.remove('nav-scrolled');
+      }
+
+      // Masquage intelligent (Smart Navbar)
+      if (currentScrollY > 90) {
+        if (diff > 8) {
+          if (dh) dh.classList.add('nav-hidden');
+          if (sh) sh.classList.add('nav-hidden');
+        } else if (diff < -8) {
+          if (dh) dh.classList.remove('nav-hidden');
+          if (sh) sh.classList.remove('nav-hidden');
+        }
+      } else {
+        if (dh) dh.classList.remove('nav-hidden');
+        if (sh) sh.classList.remove('nav-hidden');
+      }
+
+      lastScrollY = Math.max(0, currentScrollY);
+      navTicking = false;
+    });
+    navTicking = true;
+  }
+}, { passive: true });
+
 window.addEventListener('hashchange', function () { drawerOpen = false; pdQty = 1; var r = parse(); if (r.name !== 'produit') galIdx = 0; if (r.name !== 'catalogue' && r.name !== 'filtres') { shown = 6; } if (r.name !== 'filtres' && r.name !== 'catalogue') dPanel = false; render(false); });
 if (/[?&]mockup=1/.test(location.search)) document.body.classList.add('mockup');
 render(false);
 })();
+

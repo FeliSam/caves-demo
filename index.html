@@ -1,2 +1,689 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="googlebot" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1"><title></title></head><body></body></html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caves de Cotonou — Plateforme E-Commerce &amp; Dashboard Gérant</title>
+<meta name="description" content="Plateforme e-commerce et gestion pour les caves à vin, bars et restaurants de Cotonou. Boutiques en ligne, commande WhatsApp &amp; MoMo, suivi en direct et dashboard multi-tenant.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #090B0E;
+  --surface: #10141B;
+  --surface-2: #161D27;
+  --border: #232E3E;
+  --accent: #D4AF37;
+  --accent-light: #F3E5AB;
+  --accent-glow: rgba(212, 175, 55, 0.25);
+  --text: #F1F5F9;
+  --muted: #94A3B8;
+  --faint: #475569;
+  --success: #22C55E;
+  --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.dw {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+/* Header */
+header.portal-header {
+  border-bottom: 1px solid var(--border);
+  background: rgba(16, 20, 27, 0.85);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 18px 0;
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-badge-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #D4AF37, #996515);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+.brand-name {
+  font-family: 'Cinzel', serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #FFFFFF;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.header-tag {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ADE80;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.header-tag .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #22C55E;
+  box-shadow: 0 0 10px #22C55E;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+/* Hero */
+.hero {
+  padding: 64px 0 40px;
+  text-align: center;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.12) 0%, rgba(9, 11, 14, 0) 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 6px 16px;
+  border-radius: 30px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.hero h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(30px, 4.5vw, 50px);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 18px;
+  color: #FFFFFF;
+}
+.hero h1 span {
+  background: linear-gradient(135deg, #FFFFFF, var(--accent-light), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p.lead {
+  font-size: clamp(15px, 2vw, 17px);
+  color: var(--muted);
+  max-width: 700px;
+  margin: 0 auto 32px;
+}
+
+/* Feature Badges */
+.feature-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+.f-badge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.f-badge strong {
+  color: var(--accent);
+}
+
+/* Demo Flow Instructions */
+.flow-box {
+  background: linear-gradient(135deg, rgba(22, 29, 39, 0.9), rgba(16, 20, 27, 0.95));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 56px;
+  text-align: left;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+}
+.flow-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.flow-icon {
+  font-size: 22px;
+}
+.flow-header h3 {
+  font-size: 17px;
+  color: #FFFFFF;
+}
+.flow-header span {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: auto;
+  background: rgba(212, 175, 55, 0.12);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.flow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.f-step {
+  background: rgba(9, 11, 14, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.f-step-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.f-step h4 {
+  font-size: 14px;
+  color: #FFFFFF;
+  margin-bottom: 6px;
+}
+.f-step p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Cellars Section */
+.cellars-title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+.cellars-title-row h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 26px;
+  color: #FFFFFF;
+}
+.cellars-title-row p {
+  font-size: 14px;
+  color: var(--muted);
+}
+.caves-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 24px;
+  margin-bottom: 64px;
+}
+.cave-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.cave-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow);
+}
+.cave-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.cave-quarter {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.cave-tenant-tag {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+}
+.cave-card h3 {
+  font-family: 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 8px;
+}
+.cave-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 18px;
+  line-height: 1.5;
+  flex-grow: 1;
+}
+.cave-meta-list {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cave-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.cave-meta-item strong {
+  color: var(--text);
+}
+.cave-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: auto;
+}
+.btn-boutique {
+  background: linear-gradient(135deg, #D4AF37, #B8860B);
+  color: #090B0E;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 11px 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: opacity 0.2s;
+}
+.btn-boutique:hover { opacity: 0.92; }
+.btn-admin {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 11px 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-admin:hover {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Footer */
+footer.portal-footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0;
+  background: var(--surface);
+  margin-top: auto;
+  text-align: center;
+}
+.footer-text {
+  font-size: 13px;
+  color: var(--muted);
+}
+.footer-tech {
+  font-size: 12px;
+  color: var(--faint);
+  margin-top: 8px;
+}
+@media (max-width: 640px) {
+  .caves-grid { grid-template-columns: 1fr; }
+  .cave-actions { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="portal-header">
+  <div class="dw">
+    <div class="header-row">
+      <div class="brand-group">
+        <div class="brand-badge-logo">🍷</div>
+        <div>
+          <div class="brand-name">Caves de Cotonou</div>
+          <div class="brand-sub">Plateforme E-Commerce &amp; Gestion Multi-Caves</div>
+        </div>
+      </div>
+      <div class="header-tag">
+        <span class="dot"></span>
+        <span>10 Caves Connectées · Mode Local Autonome</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="dw">
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-pill">✨ Démonstration Complète &amp; Prête pour les Prospects</div>
+      <h1>L'Écosystème Digital des <span>Caves &amp; Vins à Cotonou</span></h1>
+      <p class="lead">
+        Une boutique e-commerce ultra-fluide pour les clients, couplée à un tableau de bord gérant complet pour chaque cave : commandes WhatsApp, paiements MoMo, inventaire avec alertes, reçus de caisse et statistiques.
+      </p>
+      
+      <div class="feature-badges">
+        <div class="f-badge">⚡ <strong>Livraison Express 2h</strong> &amp; Retrait</div>
+        <div class="f-badge">📱 <strong>Paiement Mobile Money</strong> (MTN / Moov / Celtiis) &amp; Cash</div>
+        <div class="f-badge">💬 <strong>Commande Directe WhatsApp</strong> préformatée</div>
+        <div class="f-badge">🗺️ <strong>Carte GPS Interactive</strong> de Cotonou</div>
+        <div class="f-badge">⚙️ <strong>Dashboard Gérant</strong> avec statuts en direct</div>
+        <div class="f-badge">🏢 <strong>Isolation Multi-Tenant</strong> des données par cave</div>
+      </div>
+    </div>
+
+    <!-- Scénario de test interactif -->
+    <div class="flow-box">
+      <div class="flow-header">
+        <span class="flow-icon">🚀</span>
+        <h3>Scénario de test recommandé pour valider la plateforme :</h3>
+        <span>Guide prospect / gérant</span>
+      </div>
+      <div class="flow-steps">
+        <div class="f-step">
+          <div class="f-step-num">Étape 01</div>
+          <h4>Ouvrir la Boutique Client</h4>
+          <p>Visitez l'accueil enrichi : carrousel, carte interactive Leaflet, conseils du sommelier et filtrez par occasion.</p>
+        </div>
+        <div class="f-step">
+          <div class="f-step-num">Étape 02</div>
+          <h4>Passer une Commande</h4>
+          <p>Ajoutez un flacon, choisissez la livraison à Cotonou (MoMo ou Cash) et cliquez sur « Commander via WhatsApp ».</p>
+        </div>
+        <div class="f-step">
+          <div class="f-step-num">Étape 03</div>
+          <h4>Consulter le Dashboard Gérant</h4>
+          <p>La commande arrive immédiatement dans l'onglet <strong>Commandes</strong> avec son statut « Nouvelle ».</p>
+        </div>
+        <div class="f-step">
+          <div class="f-step-num">Étape 04</div>
+          <h4>Gérer Statut, Stock &amp; Reçu</h4>
+          <p>Changez le statut à « Préparation », ouvrez le ticket de caisse imprimable et ajustez les stocks en cave.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Liste des 10 Caves -->
+  <section>
+    <div class="cellars-title-row">
+      <div>
+        <h2>Les 10 Établissements Partenaires à Cotonou</h2>
+        <p>Chaque cave dispose de sa propre identité visuelle et de son espace de données totalement étanche.</p>
+      </div>
+    </div>
+
+    <div class="caves-grid">
+      <!-- 1. Cave Sainte Aurélie -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Fidjrossè / Togbin</span>
+          <span class="cave-tenant-tag">cave:cave-sainte-aurelie</span>
+        </div>
+        <h3>Cave Sainte Aurélie</h3>
+        <p class="cave-desc">Cave &amp; restaurant face à la mer, sur la route des pêches à Togbin plage. Grands crus, champagnes festifs et dégustations les pieds dans le sable.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Route des pêches, carrefour Club des Rois</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 53 02 77 36</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="cave-sainte-aurelie/">🛍️ Boutique</a>
+          <a class="btn-admin" href="cave-sainte-aurelie/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 2. La Belle Robe -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Vodjè</span>
+          <span class="cave-tenant-tag">cave:la-belle-robe</span>
+        </div>
+        <h3>La Belle Robe</h3>
+        <p class="cave-desc">Bar à vin &amp; restaurant convivial, tous les soirs à Vodjè. Sélection soignée de vins de vignerons indépendants et planches gourmandes.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Rue 571, Vodjè, Cotonou</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 97 12 34 56</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="la-belle-robe/">🛍️ Boutique</a>
+          <a class="btn-admin" href="la-belle-robe/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 3. La Clé des Châteaux -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Ganhi &amp; Akpakpa</span>
+          <span class="cave-tenant-tag">cave:la-cle-des-chateaux</span>
+        </div>
+        <h3>La Clé des Châteaux</h3>
+        <p class="cave-desc">L'institution historique des grands vins et spiritueux au centre des affaires de Ganhi et Akpakpa. Millésimes rares et coffrets de prestige.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Avenue Clozel, Ganhi &amp; SOBEBRA</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 21 31 45 67</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="la-cle-des-chateaux/">🛍️ Boutique</a>
+          <a class="btn-admin" href="la-cle-des-chateaux/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 4. La Feuille de Vigne -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Saint-Michel</span>
+          <span class="cave-tenant-tag">cave:la-feuille-de-vigne</span>
+        </div>
+        <h3>La Feuille de Vigne</h3>
+        <p class="cave-desc">Cave d'expertise réputée sur le boulevard Saint-Michel, en face de l'église. Conseils personnalisés et arrivages réguliers de terroirs français et du monde.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Bd Saint-Michel, face à l'Église</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 21 32 10 98</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="la-feuille-de-vigne/">🛍️ Boutique</a>
+          <a class="btn-admin" href="la-feuille-de-vigne/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 5. Le Cellier -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Akpakpa</span>
+          <span class="cave-tenant-tag">cave:le-cellier</span>
+        </div>
+        <h3>Le Cellier</h3>
+        <p class="cave-desc">La cave de référence d'Akpakpa à Sodjèatimè. Large gamme de vins accessibles, whiskies d'âge et liqueurs pour toutes vos réceptions.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Sodjèatimè, lot 110, Akpakpa</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 95 44 33 22</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="le-cellier/">🛍️ Boutique</a>
+          <a class="btn-admin" href="le-cellier/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 6. Le Spiritueux -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Missitè / Saint-Jean</span>
+          <span class="cave-tenant-tag">cave:le-spiritueux</span>
+        </div>
+        <h3>Le Spiritueux</h3>
+        <p class="cave-desc">Cave des vins rares, cognacs d'exception et spiritueux haut de gamme au carrefour Marina. L'adresse préférée des collectionneurs et connaisseurs.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Missitè / Saint-Jean, carrefour Marina</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 96 77 88 99</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="le-spiritueux/">🛍️ Boutique</a>
+          <a class="btn-admin" href="le-spiritueux/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 7. Le Vinophile -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Saint-Michel</span>
+          <span class="cave-tenant-tag">cave:le-vinophile</span>
+        </div>
+        <h3>Le Vinophile</h3>
+        <p class="cave-desc">Passionnés de viticulture et dégustations thématiques sur l'avenue Roi Guézo. Sélection pointue de bio, biodynamie et vins d'auteurs.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Avenue Roi Guézo, Saint-Michel</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 21 30 77 66</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="le-vinophile/">🛍️ Boutique</a>
+          <a class="btn-admin" href="le-vinophile/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 8. Le Vinqueur -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Fidjrossè plage</span>
+          <span class="cave-tenant-tag">cave:le-vinqueur</span>
+        </div>
+        <h3>Le Vinqueur</h3>
+        <p class="cave-desc">Ambiance décontractée et festive en bord de mer à Fiyégnon. Vins frais, rosés fruités, champagnes et cocktails prêts pour vos soirées plage.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Fidjrossè plage, Fiyégnon, Cotonou</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 97 55 66 77</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="le-vinqueur/">🛍️ Boutique</a>
+          <a class="btn-admin" href="le-vinqueur/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 9. Maison Castel Bénin -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Haie Vive</span>
+          <span class="cave-tenant-tag">cave:maison-castel-benin</span>
+        </div>
+        <h3>Maison Castel Bénin</h3>
+        <p class="cave-desc">Boutique officielle au cœur du quartier résidentiel et diplomatique de la Haie Vive. Vins de cépages renommés, bordeaux réputés et service de conciergerie.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Pavés de la Haie Vive, près du Calypso</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 21 30 11 22</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="maison-castel-benin/">🛍️ Boutique</a>
+          <a class="btn-admin" href="maison-castel-benin/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+
+      <!-- 10. The Truth Winery -->
+      <article class="cave-card">
+        <div class="cave-card-top">
+          <span class="cave-quarter">Saint-Michel</span>
+          <span class="cave-tenant-tag">cave:the-truth-winery</span>
+        </div>
+        <h3>The Truth Winery</h3>
+        <p class="cave-desc">La vérité du vin sans artifice : dégustations à l'aveugle, flacons surprenants et cuvées exclusives sélectionnées pour les amateurs exigeants.</p>
+        <div class="cave-meta-list">
+          <div class="cave-meta-item">📍 <strong>Adresse :</strong> Quartier Saint-Michel, Cotonou</div>
+          <div class="cave-meta-item">📞 <strong>Contact :</strong> +229 01 95 11 22 33</div>
+        </div>
+        <div class="cave-actions">
+          <a class="btn-boutique" href="the-truth-winery/">🛍️ Boutique</a>
+          <a class="btn-admin" href="the-truth-winery/#/admin">⚙️ Gérant</a>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="portal-footer">
+  <div class="dw">
+    <p class="footer-text">
+      Plateforme développée pour les caves de Cotonou · Démo locale 100% fonctionnelle · Architecture prête pour déploiement Supabase.
+    </p>
+    <p class="footer-tech">
+      L'abus d'alcool est dangereux pour la santé, à consommer avec modération. Vente interdite aux mineurs.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
