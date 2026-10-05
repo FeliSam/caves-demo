@@ -92,7 +92,7 @@ function pd(p, k) {
 
 /* ---------- état (localStorage) ---------- */
 var currentTheme = (function () {
-  try { return localStorage.getItem('cave_theme') || 'dark'; } catch (e) { return 'dark'; }
+  try { return localStorage.getItem('cave_theme') || 'light'; } catch (e) { return 'light'; }
 })();
 function setTheme(t) {
   currentTheme = t;
@@ -109,29 +109,29 @@ function toggleTheme() {
 var DEFAULT_USERS = [
   {
     id: 'usr-superadmin',
-    email: 'superadmin@caves.bj',
+    email: 'admin@votre-cave.com',
     name: 'Direction Générale (SuperAdmin)',
     role: 'superadmin',
-    phone: '+229 01 97 00 00 00',
+    phone: '+229 00 00 00 01',
     caveSlug: 'all',
     tier: 'Platine'
   },
   {
-    id: 'usr-gerant-aurelie',
-    email: 'gerant@sainte-aurelie.bj',
-    name: 'Gérance Sainte-Aurélie',
+    id: 'usr-gerant',
+    email: 'gerant@votre-cave.com',
+    name: 'Gérance de la Cave',
     role: 'gerant',
-    phone: '+229 01 53 02 77 36',
-    caveSlug: 'cave-sainte-aurelie',
+    phone: '+229 00 00 00 02',
+    caveSlug: S.slug || 'cave-modele',
     tier: 'Gérant'
   },
   {
     id: 'usr-client',
-    email: 'client@cotonou.bj',
-    name: 'Patrice Bio',
+    email: 'client@exemple.com',
+    name: 'Client Démo',
     role: 'client',
-    phone: '+229 01 95 12 34 56',
-    caveSlug: 'cave-sainte-aurelie',
+    phone: '+229 00 00 00 03',
+    caveSlug: S.slug || 'cave-modele',
     tier: 'Or'
   }
 ];
@@ -263,10 +263,7 @@ function themeSunMoonSvg() {
 }
 
 function mh(title, left, right) {
-  var rHtml = right !== undefined ? right :
-    '<div style="display:flex;align-items:center;gap:6px">' +
-    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème" aria-label="Thème clair/sombre">' + themeSunMoonSvg() + '</button>' +
-    menuBtn() + '</div>';
+  var rHtml = right !== undefined ? right : menuBtn();
   return '<header class="sh">' + (left || '<span class="slot"></span>') + '<h1>' + esc(title) + '</h1>' + rHtml + '</header>';
 }
 
@@ -286,6 +283,21 @@ function socials() {
   if (S.tiktok) out += '<a href="' + esc(S.tiktok) + '" target="_blank" rel="noopener" aria-label="TikTok">' + icon('tiktok') + '</a>';
   out += '<a href="' + waLink() + '" target="_blank" rel="noopener" aria-label="WhatsApp">' + icon('whatsapp', 16) + '</a>';
   return out;
+}
+
+function openDrawer() {
+  drawerOpen = true;
+  var d = document.getElementById('drawer');
+  if (d) d.classList.add('open');
+  document.body.classList.add('drawer-locked');
+  document.documentElement.classList.add('drawer-locked');
+}
+function closeDrawer() {
+  drawerOpen = false;
+  var d = document.getElementById('drawer');
+  if (d) d.classList.remove('open');
+  document.body.classList.remove('drawer-locked');
+  document.documentElement.classList.remove('drawer-locked');
 }
 
 function drawer() {
@@ -308,7 +320,7 @@ function drawer() {
   } else {
     userHtml = '<div class="drawer-user-card">' +
       '<div class="drawer-user-info">' +
-      '<div class="drawer-avatar" style="border-color:var(--border);color:var(--muted)">👤</div>' +
+      '<div class="drawer-avatar" style="border-color:var(--border);color:var(--muted)">' + icon('user', 18) + '</div>' +
       '<div class="drawer-user-meta">' +
       '<b>Bienvenue à la Cave</b>' +
       '<span>Commandes, favoris &amp; club</span>' +
@@ -320,39 +332,39 @@ function drawer() {
   var themePill = '<div class="drawer-theme-pill">' +
     '<span>Mode d\'affichage</span>' +
     '<div class="drawer-theme-switch">' +
-    '<button class="' + (currentTheme === 'dark' ? 'active' : '') + '" data-act="set-theme" data-v="dark">🌙 Sombre</button>' +
-    '<button class="' + (currentTheme === 'light' ? 'active' : '') + '" data-act="set-theme" data-v="light">☀️ Clair</button>' +
+    '<button class="' + (currentTheme === 'light' ? 'active' : '') + '" data-act="set-theme" data-v="light">' + icon('sparkles', 13) + ' Clair</button>' +
+    '<button class="' + (currentTheme === 'dark' ? 'active' : '') + '" data-act="set-theme" data-v="dark">' + icon('droplet', 13) + ' Sombre</button>' +
     '</div></div>';
 
   var quickGrid = '<div class="drawer-quick-grid">' +
-    '<a class="drawer-quick-tile" href="#/catalogue" data-act="drawer-close"><div class="drawer-quick-icon">🍷</div><span>Boutique</span></a>' +
-    '<a class="drawer-quick-tile" href="#/" data-act="drawer-close" onclick="setTimeout(function(){var m=document.getElementById(\'carte-section\');if(m)m.scrollIntoView({behavior:\'smooth\'});},100)"><div class="drawer-quick-icon">🗺️</div><span>Carte Caves</span></a>' +
-    '<a class="drawer-quick-tile" href="#/suivi" data-act="drawer-close"><div class="drawer-quick-icon">📦</div><span>Suivi Colis</span></a>' +
-    '<a class="drawer-quick-tile" href="#/favoris" data-act="drawer-close"><div class="drawer-quick-icon">❤️</div><span>Favoris</span></a>' +
+    '<a class="drawer-quick-tile" href="#/catalogue" data-act="drawer-close"><div class="drawer-quick-icon">' + icon('wine', 18) + '</div><span>Boutique</span></a>' +
+    '<a class="drawer-quick-tile" href="#/" data-act="drawer-close" onclick="setTimeout(function(){var m=document.getElementById(\'carte-section\');if(m)m.scrollIntoView({behavior:\'smooth\'});},100)"><div class="drawer-quick-icon">' + icon('map', 18) + '</div><span>Carte Caves</span></a>' +
+    '<a class="drawer-quick-tile" href="#/suivi" data-act="drawer-close"><div class="drawer-quick-icon">' + icon('box', 18) + '</div><span>Suivi Colis</span></a>' +
+    '<a class="drawer-quick-tile" href="#/favoris" data-act="drawer-close"><div class="drawer-quick-icon">' + icon('heart14', 18) + '</div><span>Favoris</span></a>' +
     '</div>';
 
   var catChips = '<div class="drawer-sec-lbl">Nos Sélections &amp; Caves</div>' +
     '<div class="drawer-cats-list">' +
-    '<a class="drawer-cat-row" href="#/categorie/vins-rouges" data-act="drawer-close"><div class="drawer-cat-left">🍷 <span>Vins Rouges Grands Crus</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/categorie/vins-blancs" data-act="drawer-close"><div class="drawer-cat-left">🥂 <span>Vins Blancs Frais</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/categorie/roses" data-act="drawer-close"><div class="drawer-cat-left">🌸 <span>Rosés Délicats</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/categorie/champagnes" data-act="drawer-close"><div class="drawer-cat-left">🍾 <span>Champagnes &amp; Bulles</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/categorie/spiritueux" data-act="drawer-close"><div class="drawer-cat-left">🥃 <span>Spiritueux Rares</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/categorie/coffrets-cadeaux" data-act="drawer-close"><div class="drawer-cat-left">🎁 <span>Coffrets à Offrir</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/vins-rouges" data-act="drawer-close"><div class="drawer-cat-left">' + icon('wine', 16, 'c-accent') + ' <span>Vins Rouges Grands Crus</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/vins-blancs" data-act="drawer-close"><div class="drawer-cat-left">' + icon('glass', 16, 'c-accent') + ' <span>Vins Blancs Frais</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/roses" data-act="drawer-close"><div class="drawer-cat-left">' + icon('droplet', 16, 'c-accent') + ' <span>Rosés Délicats</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/champagnes" data-act="drawer-close"><div class="drawer-cat-left">' + icon('sparkles', 16, 'c-accent') + ' <span>Champagnes &amp; Bulles</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/spiritueux" data-act="drawer-close"><div class="drawer-cat-left">' + icon('wine', 16, 'c-accent') + ' <span>Spiritueux Rares</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/categorie/coffrets-cadeaux" data-act="drawer-close"><div class="drawer-cat-left">' + icon('gift', 16, 'c-accent') + ' <span>Coffrets à Offrir</span></div>' + icon('chev-right', 12) + '</a>' +
     '</div>';
 
   var servicesList = '<div class="drawer-sec-lbl">Privilèges &amp; Savoir-Faire</div>' +
     '<div class="drawer-cats-list">' +
-    '<a class="drawer-cat-row" href="#/club" data-act="drawer-close"><div class="drawer-cat-left">👑 <span>Club Privé &amp; Fidélité</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/journal" data-act="drawer-close"><div class="drawer-cat-left">📖 <span>Le Journal du Sommelier</span></div>' + icon('chev-right', 12) + '</a>' +
-    '<a class="drawer-cat-row" href="#/services" data-act="drawer-close"><div class="drawer-cat-left">🛵 <span>Livraison Express 2h &amp; MoMo</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/club" data-act="drawer-close"><div class="drawer-cat-left">' + icon('award', 16, 'c-accent') + ' <span>Club Privé &amp; Fidélité</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/journal" data-act="drawer-close"><div class="drawer-cat-left">' + icon('book', 16, 'c-accent') + ' <span>Le Journal du Sommelier</span></div>' + icon('chev-right', 12) + '</a>' +
+    '<a class="drawer-cat-row" href="#/services" data-act="drawer-close"><div class="drawer-cat-left">' + icon('truck16', 16, 'c-accent') + ' <span>Livraison Express 2h &amp; MoMo</span></div>' + icon('chev-right', 12) + '</a>' +
     '</div>';
 
   var adminCard = '';
   if (isGerant()) {
     adminCard = '<a class="drawer-admin-card" href="#/admin" data-act="drawer-close">' +
       '<div>' +
-      '<div class="drawer-admin-title">' + (isSuperAdmin() ? '👑 Console SuperAdmin' : '⚙️ Espace Gérant de Cave') + '</div>' +
+      '<div class="drawer-admin-title">' + icon('sliders', 14) + ' ' + (isSuperAdmin() ? 'Console SuperAdmin' : 'Espace Gérant de Cave') + '</div>' +
       '<div class="drawer-admin-sub">Gestion des stocks, commandes &amp; WhatsApp</div>' +
       '</div>' +
       icon('chev-right', 14) +
@@ -424,9 +436,9 @@ function dHeader(active) {
 
 function dFooter() {
   var catLinks = '<a href="#/catalogue">Tout le catalogue</a>' + (HUB ? '<a href="#/vins">Tous nos ' + esc(WP.label.toLowerCase()) + '</a>' : '') + CATS.map(function (c) { return '<a href="' + clink(c) + '">' + esc(c.title) + '</a>'; }).join('');
-  var adminFooterLink = isGerant() ? '<a href="#/admin" class="gold">⚙️ Espace Gérant</a>' : '';
+  var adminFooterLink = isGerant() ? '<a href="#/admin" class="gold">' + icon('sliders', 13) + ' Espace Gérant</a>' : '';
 
-  return '<footer class="df d-only"><div class="dw"><div class="cols">' +
+  return '<footer class="df"><div class="dw"><div class="cols">' +
     '<div class="c1"><p class="lg lg-t">' + esc(logo) + '</p><p>' + esc(S.about || S.slogan) + '</p><div class="soc">' + socials() + '</div></div>' +
     '<div class="col"><h4>Boutique</h4><div>' + catLinks + '</div></div>' +
     '<div class="col"><h4>Services</h4><div><a href="#/club">' + esc(CLUB.name || 'Club Privé') + '</a><a href="#/services">Livraison & paiement</a><a href="#/journal">Le Journal</a><a href="#/suivi">Suivi de commande</a>' + adminFooterLink + '</div></div>' +
@@ -488,38 +500,32 @@ function toggleIn(arr, v) { var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1)
 
 /* =========================== DONNÉES COMPLÉMENTAIRES =========================== */
 var CAVES_DATA = [
-  { slug: 'cave-sainte-aurelie', name: 'Cave Sainte Aurélie', lat: 6.3535, lng: 2.3385, neighbourhood: 'Fidjrossè', address: 'Route des pêches, carrefour Club des Rois, Togbin plage, Fidjrossè', phone: '+229 01 53 02 77 36', whatsapp: '2290195316910', url: '../cave-sainte-aurelie/' },
-  { slug: 'la-belle-robe', name: 'La Belle Robe', lat: 6.3630, lng: 2.3920, neighbourhood: 'Vodjè', address: 'Rue 571, Vodjè (Plus Code 999W+P7)', phone: '+229 01 97 12 34 56', whatsapp: '2290197123456', url: '../la-belle-robe/' },
-  { slug: 'la-cle-des-chateaux', name: 'La Clé des Châteaux', lat: 6.3601, lng: 2.4342, neighbourhood: 'Ganhi', address: 'Avenue Clozel, Ganhi & SOBEBRA Akpakpa', phone: '+229 01 21 31 45 67', whatsapp: '2290121314567', url: '../la-cle-des-chateaux/' },
-  { slug: 'la-feuille-de-vigne', name: 'La Feuille de Vigne', lat: 6.3715, lng: 2.4280, neighbourhood: 'Saint-Michel', address: 'Bd Saint-Michel, face à l\'Église, Gbedokpo', phone: '+229 01 21 32 10 98', whatsapp: '2290121321098', url: '../la-feuille-de-vigne/' },
-  { slug: 'le-cellier', name: 'Le Cellier', lat: 6.3685, lng: 2.4490, neighbourhood: 'Akpakpa', address: 'Sodjèatimè, lot 110, Akpakpa', phone: '+229 01 95 44 33 22', whatsapp: '2290195443322', url: '../le-cellier/' },
-  { slug: 'le-spiritueux', name: 'Le Spiritueux — Cave des Vins Rares', lat: 6.3760, lng: 2.4110, neighbourhood: 'Missitè', address: 'Missitè / Saint-Jean, carrefour Marina', phone: '+229 01 96 77 88 99', whatsapp: '2290196778899', url: '../le-spiritueux/' },
-  { slug: 'le-vinophile', name: 'Le Vinophile', lat: 6.3705, lng: 2.4220, neighbourhood: 'Saint-Michel', address: 'Avenue Roi Guézo, Saint-Michel', phone: '+229 01 21 30 77 66', whatsapp: '2290121307766', url: '../le-vinophile/' },
-  { slug: 'le-vinqueur', name: 'Le Vinqueur', lat: 6.3520, lng: 2.3650, neighbourhood: 'Fidjrossè', address: 'Fidjrossè plage, Fiyégnon', phone: '+229 01 97 55 66 77', whatsapp: '2290197556677', url: '../le-vinqueur/' },
-  { slug: 'maison-castel-benin', name: 'Maison Castel Bénin', lat: 6.3575, lng: 2.4045, neighbourhood: 'Haie Vive', address: 'Pavés de la Haie Vive, 100 m avant le Calypso', phone: '+229 01 21 30 11 22', whatsapp: '2290121301122', url: '../maison-castel-benin/' },
-  { slug: 'the-truth-winery', name: 'The Truth Winery', lat: 6.3690, lng: 2.4210, neighbourhood: 'Saint-Michel', address: 'Saint-Michel, Cotonou', phone: '+229 01 95 11 22 33', whatsapp: '2290195112233', url: '../the-truth-winery/' }
+  { slug: 'cave-modele', name: 'La Cave Principale (Votre Boutique)', lat: 6.3650, lng: 2.3950, neighbourhood: 'Quartier Central', address: '01 Avenue Commerciale, Cotonou', phone: '+229 00 00 00 00', whatsapp: '22900000000', url: '#' },
+  { slug: 'point-relais-nord', name: 'Point Relais Nord', lat: 6.3750, lng: 2.4200, neighbourhood: 'Zone Nord', address: 'Boulevard Central, Zone Nord, Cotonou', phone: '+229 00 00 00 01', whatsapp: '22900000001', url: '#' },
+  { slug: 'point-relais-est', name: 'Cave Affiliée Est', lat: 6.3680, lng: 2.4450, neighbourhood: 'Zone Est', address: 'Carrefour Commercial, Zone Est, Cotonou', phone: '+229 00 00 00 02', whatsapp: '22900000002', url: '#' },
+  { slug: 'point-relais-ouest', name: 'Comptoir de l\'Ouest', lat: 6.3530, lng: 2.3600, neighbourhood: 'Zone Ouest', address: 'Avenue du Littoral, Zone Ouest, Cotonou', phone: '+229 00 00 00 03', whatsapp: '22900000003', url: '#' }
 ];
 
 var OCCASIONS = [
   { id: 'anniversaire', title: 'Anniversaire & Célébrations', tag: 'Grands Crus', image: 'assets/img/banner-glasses.webp', desc: 'Magnums festifs, champagnes bruts et coffrets bois sur-mesure pour célébrer en beauté.', link: '#/categorie/champagnes', cta: 'Voir les champagnes' },
-  { id: 'mariage', title: 'Mariages & Réceptions', tag: 'Sur-mesure', image: 'assets/img/event-dinner.webp', desc: 'Dégustation offerte, calcul des bouteilles selon votre menu, livraison sur place et reprise des non-ouverts.', link: waLink('Bonjour ' + S.name + ', je prépare un mariage / une grande réception et j\'aimerais un devis personnalisé.'), cta: 'Devis Mariage WhatsApp', isExternal: true },
+  { id: 'mariage', title: 'Mariages & Réceptions', tag: 'Sur-mesure', image: 'assets/img/event-dinner.webp', desc: 'Dégustation offerte, calcul des bouteilles selon votre menu, livraison sur place et reprise des non-ouverts.', link: waLink('Bonjour, je prépare une réception et j\'aimerais un devis personnalisé.'), cta: 'Devis WhatsApp', isExternal: true },
   { id: 'entreprise', title: 'Cadeaux d\'Entreprise', tag: 'B2B & Affaires', image: 'assets/img/banner-wood-box.webp', desc: 'Caisses bois d\'exception, message manuscrit offert, facturation société et livraison groupée.', link: giftLink(), cta: 'Composer un coffret' },
-  { id: 'apero', title: 'Apéro Chic & Plage', tag: 'Fraîcheur', image: 'assets/img/banner-gift.webp', desc: 'Rosés pâles de Provence, blancs minéraux et spiritueux choisis pour savourer entre amis face à la mer.', link: '#/vins', cta: 'Nos vins d\'apéritif' }
+  { id: 'apero', title: 'Apéro Chic & Moments Partagés', tag: 'Fraîcheur', image: 'assets/img/banner-gift.webp', desc: 'Rosés de Provence, blancs minéraux et spiritueux choisis pour savourer entre amis.', link: '#/vins', cta: 'Nos vins d\'apéritif' }
 ];
 
 var FAQ_DATA = [
-  { q: 'Quels sont les délais et quartiers de livraison à Cotonou et ses environs ?', a: 'Nous livrons dans tout Cotonou en express sous 2 heures (Fidjrossè, Haie Vive, Cadjèhoun, Ganhi, Akpakpa, Cocotiers...). Nous desservons également Abomey-Calavi et la route des pêches. Le retrait gratuit à la cave est préparé en 30 minutes.' },
-  { q: 'Comment s\'effectue le paiement par Mobile Money ou à la livraison ?', a: 'Vous pouvez régler via MTN Mobile Money, Moov Money (Flooz) ou Celtiis Cash dès confirmation de la commande. Le règlement en espèces ou par MoMo directement au livreur à la réception est également possible sans frais additionnels.' },
-  { q: 'Comment garantissez-vous la conservation des vins sous le climat chaud de Cotonou ?', a: 'Toutes nos bouteilles sont entreposées dans notre cave climatisée à température constante (14°C – 16°C) et à hygrométrie contrôlée. Lors de la livraison, elles sont calées dans des caissons isothermes protégés des chocs et de la chaleur.' },
-  { q: 'Est-il possible de faire livrer un coffret cadeau avec un mot personnalisé ?', a: 'Oui, sans surcoût ! Cochez simplement « Ceci est un cadeau » au moment de votre commande. Nous joignons une carte manuscrite avec vos mots et préparons un emballage cadeau soigné.' },
-  { q: 'Proposez-vous des tarifs dégressifs et la reprise pour les mariages ?', a: 'Oui. Pour les mariages et grandes réceptions, notre sommelier établit un devis optimisé selon vos plats et vos invités. Nous reprenons toutes les bouteilles non débouchées et intactes après l\'événement.' },
-  { q: 'Que se passe-t-il si une bouteille présente un défaut (goût de bouchon) ?', a: 'Votre satisfaction est totale : si un flacon présente un goût de bouchon, signalez-le nous avec une photo sur WhatsApp ou passez à la cave. Nous procédons immédiatement à un échange ou à un avoir.' }
+  { q: 'Quels sont les délais et zones de livraison ?', a: 'Nous livrons dans toute la ville et ses environs en express sous 2 heures. Le retrait gratuit à la cave est préparé en 30 minutes.' },
+  { q: 'Comment s\'effectue le paiement par Mobile Money ou à la livraison ?', a: 'Vous pouvez régler via Mobile Money (MTN MoMo, Moov Money, Celtiis Cash) ou en espèces à la livraison sans frais additionnels.' },
+  { q: 'Comment garantissez-vous la conservation des bouteilles ?', a: 'Toutes les bouteilles sont entreposées dans notre cave climatisée à température constante (14°C – 16°C). Pendant la livraison, elles voyagent dans des caissons isothermes.' },
+  { q: 'Est-il possible de faire livrer un coffret cadeau avec un mot personnalisé ?', a: 'Oui, sans surcoût ! Cochez simplement « Ceci est un cadeau » au moment de votre commande. Nous joignons une carte manuscrite avec vos mots.' },
+  { q: 'Proposez-vous des tarifs dégressifs et la reprise pour les mariages ?', a: 'Oui. Pour les grandes réceptions, notre sommelier établit un devis optimisé selon vos plats. Nous reprenons toutes les bouteilles non débouchées après l\'événement.' },
+  { q: 'Que se passe-t-il si une bouteille présente un défaut (goût de bouchon) ?', a: 'Votre satisfaction est garantie : si un flacon présente un goût de bouchon, signalez-le nous avec une photo ou passez à la cave pour un échange immédiat.' }
 ];
 
 var REVIEWS_DATA = [
-  { name: 'Dr. Marc Allagbé', city: 'Haie Vive, Cotonou', stars: 5, date: 'Il y a 3 jours', text: 'Commande passée un samedi soir pour un dîner improvisé. Livrée en 40 minutes à la Haie Vive, le champagne était impeccablement frais. Paiement MoMo en 10 secondes. Chapeau !', bottle: 'Champagne Brut Tradition' },
-  { name: 'Sandrine Kpadonou', city: 'Ganhi, Cotonou', stars: 5, date: 'Il y a 1 semaine', text: 'J’ai fait livrer un coffret prestige bois pour l’anniversaire d’un collaborateur avec une carte manuscrite. Très soigné, le bordeaux a fait sensation.', bottle: 'Coffret Prestige Bois' },
-  { name: 'Cédric Dossou-Yovo', city: 'Fidjrossè, Cotonou', stars: 5, date: 'Il y a 2 semaines', text: 'Enfin une vraie cave à Cotonou où les vins ne souffrent pas de la chaleur ! Les rouges sont conservés dans les règles de l\'art. Les conseils sur WhatsApp m\'ont été très précieux.', bottle: 'Cuvée Prestige Médoc 2016' }
+  { name: 'Dr. Marc A.', city: 'Quartier Central', stars: 5, date: 'Il y a 3 jours', text: 'Commande passée en soirée pour un dîner improvisé. Livrée en 40 minutes, bouteilles parfaitement fraîches. Paiement MoMo instantané. Service irréprochable !', bottle: 'Champagne Brut Tradition' },
+  { name: 'Sandrine K.', city: 'Zone Résidentielle', stars: 5, date: 'Il y a 1 semaine', text: 'J’ai fait livrer un coffret prestige bois avec message personnalisé pour un anniversaire d’entreprise. Soigné et élégant, le vin a fait l’unanimité.', bottle: 'Coffret Prestige Bois' },
+  { name: 'Cédric D.', city: 'Zone Littorale', stars: 5, date: 'Il y a 2 semaines', text: 'Conservation exemplaire : les bouteilles sont stockées à température idéale, les conseils sur WhatsApp sont réactifs et précis. Une vraie référence.', bottle: 'Cuvée Prestige Médoc 2016' }
 ];
 
 /* --- Générateurs de composants d'accueil --- */
@@ -631,7 +637,7 @@ function interactiveMapSection(mode) {
     '<h3>' + icon('pin', 18, 'c-accent') + ' Emplacement &amp; Itinéraire</h3>' +
     '<div class="map-filter-btns">' +
     '<button class="map-pill' + (mapFilter === 'current' ? ' on' : '') + '" data-act="map-filter" data-v="current">📍 ' + esc(S.name) + '</button>' +
-    '<button class="map-pill' + (mapFilter === 'all' ? ' on' : '') + '" data-act="map-filter" data-v="all">🗺️ Toutes les caves de Cotonou (' + CAVES_DATA.length + ')</button>' +
+    '<button class="map-pill' + (mapFilter === 'all' ? ' on' : '') + '" data-act="map-filter" data-v="all">🗺️ Tous les points &amp; caves (' + CAVES_DATA.length + ')</button>' +
     '</div></div>' +
     '<div class="map-container-outer">' +
     '<div class="map-viewport">' +
@@ -728,9 +734,7 @@ V.home = function () {
     '<header class="sh">' +
     '<a href="#/" class="slot-logo lg-t" style="font-family:var(--serif);font-weight:700;font-size:16px;text-transform:uppercase;color:var(--text);letter-spacing:.03em;display:flex;align-items:center;gap:6px">' +
     '<span style="font-size:18px">🍷</span> ' + esc(logo) + '</a>' +
-    '<div style="display:flex;align-items:center;gap:6px">' +
-    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème" aria-label="Thème clair/sombre">' + themeSunMoonSvg() + '</button>' +
-    menuBtn() + '</div></header>' +
+    menuBtn() + '</header>' +
     '<div class="v home">' +
     carousel('m') +
     trustBar('m') +
@@ -1703,11 +1707,7 @@ V.admin = function () {
     superadminPanel +
     '</div>';
 
-  var mHeader = statusbar() + mh('Espace Gérance', back('#/'),
-    '<div style="display:flex;align-items:center;gap:6px">' +
-    '<button class="theme-btn-sm" data-act="toggle-theme" title="Changer de thème">' + themeSunMoonSvg() + '</button>' +
-    menuBtn() + '</div>'
-  );
+  var mHeader = statusbar() + mh('Espace Gérance', back('#/'));
   return { m: mHeader + content, d: '<section class="dw" style="padding-top:24px;padding-bottom:60px">' + content + '</section>', nav: 'home', dnav: '', title: 'Tableau de bord Gérant — ' + S.name };
 };
 
@@ -1973,12 +1973,12 @@ function ageGate() {
 function rerender() { render(true); }
 document.addEventListener('click', function (e) {
   var el = e.target.closest('[data-act]');
-  if (!el) { if (e.target.closest('.drawer nav a, .drawer .info a')) { drawerOpen = false; } return; }
+  if (!el) { if (e.target.closest('.drawer nav a, .drawer .info a, .drawer a')) { closeDrawer(); } return; }
   var a = el.getAttribute('data-act'), id = el.getAttribute('data-id');
   switch (a) {
     case 'back': return; /* lien normal vers l'écran parent */
-    case 'drawer': drawerOpen = true; document.getElementById('drawer').classList.add('open'); return;
-    case 'drawer-close': drawerOpen = false; document.getElementById('drawer').classList.remove('open'); return;
+    case 'drawer': openDrawer(); return;
+    case 'drawer-close': closeDrawer(); return;
     case 'add': e.preventDefault(); addCart(id, 1); rerender(); return;
     case 'addq': addCart(id, pdQty); pdQty = 1; rerender(); return;
     case 'pdq': pdQty = Math.max(1, pdQty + (+el.getAttribute('data-d'))); document.getElementById('pdq').textContent = pdQty; return;
@@ -2122,7 +2122,7 @@ document.addEventListener('keydown', function (e) {
     var v = el.value.trim(); recent = [v].concat(recent.filter(function (x) { return x !== v; })).slice(0, 5); persist(); el.blur();
   }
   if (e.key === 'Escape') {
-    if (drawerOpen) { drawerOpen = false; document.getElementById('drawer').classList.remove('open'); }
+    if (drawerOpen) { closeDrawer(); }
     var rm = document.getElementById('receipt-modal'); if (rm) rm.remove();
   }
 });
@@ -2207,7 +2207,7 @@ window.addEventListener('scroll', function () {
   }
 }, { passive: true });
 
-window.addEventListener('hashchange', function () { drawerOpen = false; pdQty = 1; var r = parse(); if (r.name !== 'produit') galIdx = 0; if (r.name !== 'catalogue' && r.name !== 'filtres') { shown = 6; } if (r.name !== 'filtres' && r.name !== 'catalogue') dPanel = false; render(false); });
+window.addEventListener('hashchange', function () { closeDrawer(); pdQty = 1; var r = parse(); if (r.name !== 'produit') galIdx = 0; if (r.name !== 'catalogue' && r.name !== 'filtres') { shown = 6; } if (r.name !== 'filtres' && r.name !== 'catalogue') dPanel = false; render(false); });
 if (/[?&]mockup=1/.test(location.search)) document.body.classList.add('mockup');
 render(false);
 })();
