@@ -35,7 +35,7 @@ var T = Object.assign({
   ageYes: "Oui, j'ai plus de 18 ans", ageNo: 'Non, je suis mineur',
   ageRefused: "Désolé, la vente d'alcool est interdite aux mineurs. Revenez nous voir à votre majorité !",
   picks: 'Coups de cœur du sommelier', limited: 'Éditions Limitées', seeAll: 'Voir tout',
-  catalogueTitle: 'La Cave', catalogueIntroTitle: 'La Collection',
+  catalogueTitle: 'La Feuille de Vigne', catalogueIntroTitle: 'La Collection',
   catalogueIntro: 'Explorez une sélection de vins, champagnes et spiritueux, choisis avec exigence et conservés à température dans notre cave.',
   searchPh: 'Rechercher un domaine, millésime...', searchPh2: 'Rechercher un domaine, cépage, région...',
   giftTitle: 'Idéal pour Offrir',
