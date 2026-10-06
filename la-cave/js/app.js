@@ -1853,8 +1853,9 @@ V.admin = function () {
     '<button class="adm-btn" data-act="adm-reset-settings">↺ Rétablir par Défaut</button>' +
     '<button class="adm-btn" data-act="adm-reset-demo-orders" style="margin-left:auto;color:#ef4444;border-color:rgba(239,68,68,.3)">🔄 Réinitialiser les Commandes Démo</button>' +
     '</div></div>' +
+    '</div>';
 
-    /* Grille des 10 Caves de Cotonou 
+    /* Grille des 10 Caves de Cotonou (Commenté)
     '<div class="dcard" style="padding:22px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
     '<div><h4 style="margin:0;font-size:16px;font-family:var(--serif)">🏢 Réseau des 10 Établissements Partenaires à Cotonou</h4><p style="font-size:12px;color:var(--muted);margin:2px 0 0 0">Chaque boutique dispose de son identité, de sa propre clé de stockage et de son espace gérant.</p></div>' +
@@ -1877,7 +1878,8 @@ V.admin = function () {
         '</div></div>';
     }).join('') +
     '</div></div>' +
-    '</div>';*/
+    '</div>';
+    */
 
   var superadminPanel = '';
   if (isSuperAdmin()) {
