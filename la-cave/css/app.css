@@ -1787,3 +1787,55 @@ body{transition:background-color .3s ease,color .3s ease}
 .adm-role-badge.gerant{background:var(--accent);color:var(--on-accent)}
 .adm-role-badge.client{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
 
+/* =========================== STYLES VENTES & STATISTIQUES =========================== */
+.adm-stat-filters{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.adm-stat-btn{padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer;transition:all .2s ease}
+.adm-stat-btn:hover{color:var(--text);border-color:color-mix(in srgb,var(--accent) 50%,var(--border))}
+.adm-stat-btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:0 2px 10px rgba(0,0,0,.25)}
+
+.adm-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px}
+.adm-chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.adm-chart-head h4{margin:0;font-size:15px;color:var(--text)}
+.adm-chart-head span{font-size:12px;color:var(--muted)}
+.adm-chart-bars{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:180px;padding:10px 0 0;border-bottom:1px solid var(--border)}
+.adm-chart-col{display:flex;flex-direction:column;align-items:center;flex:1;height:100%;justify-content:flex-end;position:relative}
+.adm-chart-val{font-size:10px;font-weight:700;color:var(--accent);margin-bottom:6px;white-space:nowrap;opacity:.9}
+.adm-chart-bar{width:100%;max-width:36px;border-radius:6px 6px 2px 2px;background:color-mix(in srgb,var(--accent) 45%,var(--surface-2));transition:all .3s ease;cursor:pointer;min-height:10px;position:relative}
+.adm-chart-bar:hover{background:var(--accent);transform:scaleY(1.03)}
+.adm-chart-bar.peak{background:linear-gradient(180deg,#F5DEB3 0%,var(--accent) 100%);box-shadow:0 0 14px rgba(226,186,118,.35)}
+.adm-chart-lbl{font-size:11px;color:var(--muted);margin-top:8px;text-align:center;font-weight:600}
+
+.adm-cat-item{padding:12px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 40%,transparent)}
+.adm-cat-item:last-child{border-bottom:none}
+.adm-cat-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;align-items:center}
+.adm-cat-bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.adm-cat-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .4s ease}
+
+/* =========================== STYLES MULTI-CAVES & RÉGLAGES =========================== */
+.adm-tenant-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:16px}
+@media (min-width:640px){.adm-tenant-grid{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:1100px){.adm-tenant-grid{grid-template-columns:repeat(3,1fr)}}
+.adm-tenant-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:all .2s ease;position:relative}
+.adm-tenant-card:hover{border-color:color-mix(in srgb,var(--accent) 60%,var(--border));transform:translateY(-2px)}
+.adm-tenant-card.current{border:1.5px solid var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--surface));box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.adm-tenant-badge{display:inline-flex;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.adm-tenant-badge.active{background:rgba(34,197,94,.18);color:#4ade80;border:1px solid rgba(34,197,94,.35)}
+.adm-tenant-badge.other{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.adm-tenant-card h4{margin:0;font-size:15px;color:var(--text);font-family:var(--serif)}
+.adm-tenant-desc{font-size:11.5px;color:var(--muted);line-height:1.45;margin:0}
+.adm-tenant-actions{display:flex;gap:6px;margin-top:auto}
+.adm-tenant-actions a{flex:1;text-align:center;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;border:1px solid var(--border);background:var(--surface-2);color:var(--text);transition:all .2s ease}
+.adm-tenant-actions a:hover{border-color:var(--accent);color:var(--accent)}
+.adm-tenant-actions a.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+.adm-settings-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:24px}
+.adm-settings-grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:900px){.adm-settings-grid{grid-template-columns:repeat(2,1fr)}}
+.adm-setting-field{display:flex;flex-direction:column;gap:6px}
+.adm-setting-field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.adm-setting-field input, .adm-setting-field select, .adm-setting-field textarea{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:12.5px;font-family:inherit;transition:border-color .2s ease;box-sizing:border-box}
+.adm-setting-field input:focus, .adm-setting-field textarea:focus{border-color:var(--accent);outline:none}
+.adm-setting-hint{font-size:11px;color:var(--muted);margin-top:2px}
+.adm-settings-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+

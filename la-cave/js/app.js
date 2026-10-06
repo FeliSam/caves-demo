@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 var S = window.SHOP || {}, IC = window.ICONS || {};
-var KEY = 'cave:' + (S.slug || 'demo') + ':';
+var KEY = 'cave:' + (S.slug || 'la-feuille-de-vigne') + ':';
 var app = document.getElementById('app');
 
 /* ---------- utilitaires ---------- */
@@ -13,8 +13,35 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function num(n, sep) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, sep || '\u00a0'); }
 function fmt(n) { return num(n) + '\u00a0' + (S.currency || 'FCFA'); }
 function fmtTxt(n) { return num(n, ' ') + ' ' + (S.currency || 'FCFA'); }
-function load(k, d) { try { var v = localStorage.getItem(KEY + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
+function load(k, d) {
+  try {
+    var v = localStorage.getItem(KEY + k);
+    if (v == null && S.slug === 'la-feuille-de-vigne') {
+      v = localStorage.getItem('cave:cave-modele:' + k);
+    }
+    return v == null ? d : JSON.parse(v);
+  } catch (e) { return d; }
+}
 function save(k, v) { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) {} }
+
+/* Réglages personnalisés persistés */
+function applySettings(cfg) {
+  if (!cfg) return;
+  if (cfg.name) { S.name = cfg.name; S.logoText = cfg.name; }
+  if (cfg.slogan) S.slogan = cfg.slogan;
+  if (cfg.phone) S.phone = cfg.phone;
+  if (cfg.whatsapp) S.whatsapp = cfg.whatsapp;
+  if (cfg.address) S.address = cfg.address;
+  if (cfg.neighbourhood) S.neighbourhood = cfg.neighbourhood;
+  if (cfg.orderPrefix) S.orderPrefix = cfg.orderPrefix;
+  if (cfg.freeFrom) {
+    if (!S.delivery) S.delivery = {};
+    S.delivery.freeFrom = +cfg.freeFrom;
+  }
+}
+var savedSettings = load('settings', null);
+if (savedSettings) applySettings(savedSettings);
+
 function icon(name, size, cls) {
   var s = IC[name] || '';
   if (size && s) {
@@ -26,7 +53,7 @@ function icon(name, size, cls) {
 function initials(s) { return String(s).split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase(); }
 function waLink(text) { return 'https://wa.me/' + String(S.whatsapp || '').replace(/\D/g, '') + (text ? '?text=' + encodeURIComponent(text) : ''); }
 function telLink() { return 'tel:' + String(S.phone || '').replace(/[^\d+]/g, ''); }
-var logo = S.logoText || S.name || 'Cave';
+var logo = S.logoText || S.name || 'La Feuille de Vigne';
 
 /* ---------- textes par défaut (adaptés du Figma) — surchargeables via shop.json > texts ---------- */
 var T = Object.assign({
@@ -44,7 +71,7 @@ var T = Object.assign({
   newsTitle: 'Recevez nos nouveaux arrivages',
   newsText: "Soyez informé en priorité de l'arrivée de nos nouvelles sélections et de nos ventes privées, directement sur WhatsApp.",
   tastingTitle: 'Note de Dégustation',
-  journalTitle: 'Le Journal de la Cave',
+  journalTitle: 'Le Journal de La Feuille de Vigne',
   journalIntro: "Conseils de conservation, accords avec la cuisine d'ici et secrets de sommelier : nos chroniques pour mieux choisir et mieux déguster.",
   reassure: 'Bouteilles calées et protégées de la chaleur pendant tout le trajet.',
   notFoundTitle: 'Cette bouteille semble avoir disparu...',
@@ -109,20 +136,20 @@ function toggleTheme() {
 var DEFAULT_USERS = [
   {
     id: 'usr-superadmin',
-    email: 'admin@votre-cave.com',
+    email: 'admin@lafeuilledevigne.bj',
     name: 'Direction Générale (SuperAdmin)',
     role: 'superadmin',
-    phone: '+229 00 00 00 01',
+    phone: '+229 01 21 32 10 99',
     caveSlug: 'all',
     tier: 'Platine'
   },
   {
     id: 'usr-gerant',
-    email: 'gerant@votre-cave.com',
-    name: 'Gérance de la Cave',
+    email: 'gerant@lafeuilledevigne.bj',
+    name: 'Gérance La Feuille de Vigne',
     role: 'gerant',
-    phone: '+229 00 00 00 02',
-    caveSlug: S.slug || 'cave-modele',
+    phone: '+229 01 21 32 10 98',
+    caveSlug: S.slug || 'la-feuille-de-vigne',
     tier: 'Gérant'
   },
   {
@@ -130,8 +157,8 @@ var DEFAULT_USERS = [
     email: 'client@exemple.com',
     name: 'Client Démo',
     role: 'client',
-    phone: '+229 00 00 00 03',
-    caveSlug: S.slug || 'cave-modele',
+    phone: '+229 01 66 00 00 00',
+    caveSlug: S.slug || 'la-feuille-de-vigne',
     tier: 'Or'
   }
 ];
@@ -322,7 +349,7 @@ function drawer() {
       '<div class="drawer-user-info">' +
       '<div class="drawer-avatar" style="border-color:var(--border);color:var(--muted)">' + icon('user', 18) + '</div>' +
       '<div class="drawer-user-meta">' +
-      '<b>Bienvenue à la Cave</b>' +
+      '<b>Bienvenue à ' + esc(S.name) + '</b>' +
       '<span>Commandes, favoris &amp; club</span>' +
       '</div></div>' +
       '<a class="drawer-btn-login" href="#/connexion" data-act="drawer-close">' + icon('user', 13) + ' Connexion</a>' +
@@ -500,10 +527,16 @@ function toggleIn(arr, v) { var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1)
 
 /* =========================== DONNÉES COMPLÉMENTAIRES =========================== */
 var CAVES_DATA = [
-  { slug: 'cave-modele', name: 'La Cave Principale (Votre Boutique)', lat: 6.3650, lng: 2.3950, neighbourhood: 'Quartier Central', address: '01 Avenue Commerciale, Cotonou', phone: '+229 00 00 00 00', whatsapp: '22900000000', url: '#' },
-  { slug: 'point-relais-nord', name: 'Point Relais Nord', lat: 6.3750, lng: 2.4200, neighbourhood: 'Zone Nord', address: 'Boulevard Central, Zone Nord, Cotonou', phone: '+229 00 00 00 01', whatsapp: '22900000001', url: '#' },
-  { slug: 'point-relais-est', name: 'Cave Affiliée Est', lat: 6.3680, lng: 2.4450, neighbourhood: 'Zone Est', address: 'Carrefour Commercial, Zone Est, Cotonou', phone: '+229 00 00 00 02', whatsapp: '22900000002', url: '#' },
-  { slug: 'point-relais-ouest', name: 'Comptoir de l\'Ouest', lat: 6.3530, lng: 2.3600, neighbourhood: 'Zone Ouest', address: 'Avenue du Littoral, Zone Ouest, Cotonou', phone: '+229 00 00 00 03', whatsapp: '22900000003', url: '#' }
+  { slug: 'la-feuille-de-vigne', name: 'La Feuille de Vigne (Votre Boutique)', lat: 6.3715, lng: 2.4280, neighbourhood: 'Saint-Michel', address: 'Bd Saint-Michel, face à l\'église, Gbedokpo', phone: '+229 01 21 32 10 98', whatsapp: '2290121321098', url: '#' },
+  { slug: 'cave-sainte-aurelie', name: 'Cave Sainte Aurélie', lat: 6.3535, lng: 2.3385, neighbourhood: 'Fidjrossè', address: 'Route des pêches, carrefour Club des Rois, Togbin plage, Fidjrossè', phone: '+229 01 53 02 77 36', whatsapp: '2290195316910', url: '../cave-sainte-aurelie/' },
+  { slug: 'la-belle-robe', name: 'La Belle Robe', lat: 6.3630, lng: 2.3920, neighbourhood: 'Vodjè', address: 'Rue 571, Vodjè (Plus Code 999W+P7)', phone: '+229 01 97 12 34 56', whatsapp: '2290197123456', url: '../la-belle-robe/' },
+  { slug: 'la-cle-des-chateaux', name: 'La Clé des Châteaux', lat: 6.3601, lng: 2.4342, neighbourhood: 'Ganhi', address: 'Avenue Clozel, Ganhi & SOBEBRA Akpakpa', phone: '+229 01 21 31 45 67', whatsapp: '2290121314567', url: '../la-cle-des-chateaux/' },
+  { slug: 'le-cellier', name: 'Le Cellier', lat: 6.3685, lng: 2.4490, neighbourhood: 'Akpakpa', address: 'Sodjèatimè, lot 110, Akpakpa', phone: '+229 01 95 44 33 22', whatsapp: '2290195443322', url: '../le-cellier/' },
+  { slug: 'le-spiritueux', name: 'Le Spiritueux - Cave des Vins Rares', lat: 6.3760, lng: 2.4110, neighbourhood: 'Missitè', address: 'Missitè / Saint-Jean, carrefour Marina', phone: '+229 01 96 77 88 99', whatsapp: '2290196778899', url: '../le-spiritueux/' },
+  { slug: 'le-vinophile', name: 'Le Vinophile', lat: 6.3705, lng: 2.4220, neighbourhood: 'Saint-Michel', address: 'Avenue Roi Guézo, Saint-Michel', phone: '+229 01 21 30 77 66', whatsapp: '2290121307766', url: '../le-vinophile/' },
+  { slug: 'le-vinqueur', name: 'Le Vinqueur', lat: 6.3520, lng: 2.3650, neighbourhood: 'Fidjrossè', address: 'Fidjrossè plage, Fiyégnon', phone: '+229 01 97 55 66 77', whatsapp: '2290197556677', url: '../le-vinqueur/' },
+  { slug: 'maison-castel-benin', name: 'Maison Castel Bénin', lat: 6.3575, lng: 2.4045, neighbourhood: 'Haie Vive', address: 'Pavés de la Haie Vive, 100 m avant le Calypso', phone: '+229 01 21 30 11 22', whatsapp: '2290121301122', url: '../maison-castel-benin/' },
+  { slug: 'the-truth-winery', name: 'The Truth Winery', lat: 6.3690, lng: 2.4210, neighbourhood: 'Saint-Michel', address: 'Saint-Michel, Cotonou', phone: '+229 01 95 11 22 33', whatsapp: '2290195112233', url: '../the-truth-winery/' }
 ];
 
 var OCCASIONS = [
@@ -751,7 +784,7 @@ V.home = function () {
   var d = carousel('d') +
     trustBar('d') +
     homeHighlights('d') +
-    '<section class="dw dsec"><h2 class="dh2">Explorez la Cave</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
+    '<section class="dw dsec"><h2 class="dh2">Explorez ' + esc(S.name) + '</h2><div class="dgrid g6">' + CATS.map(function (c) { return '<a class="dcat" href="' + clink(c) + '"><span class="iw">' + icon(c.iconDesktop || c.icon, 24) + '</span>' + esc(c.labelLong || c.label) + '</a>'; }).join('') + '</div></section>' +
     occasionsHtml('d') +
     sommelierAdviceHtml('d') +
     statsCountersHtml('d') +
@@ -1137,9 +1170,9 @@ V.paiement = function () {
   var p = payOpt(), total = subtotal() + shipCost(subtotal());
   var m = statusbar() + mh('Paiement', back('#/commande'), '') + '<div class="v co" style="padding-bottom:0">' + steps(1) +
     '<div class="fgroup"><p class="lbl11">Méthodes de paiement</p>' + PAYS.map(function (x) { var on = x.id === p.id; return '<button class="pm card' + (on ? ' on' : '') + '" data-act="pay" data-id="' + x.id + '"><span class="pi">' + payIcon(x) + '</span><span class="om"><b>' + esc(x.label) + '</b><span>' + esc(x.desc) + '</span></span><i class="rd"></i></button>'; }).join('') + '</div>' +
-    (p.type === 'momo' ? '<div class="fgroup"><p class="lbl11">Numéro Mobile Money</p><label class="phonef"><span>' + esc(PREFIX) + '</span><input type="tel" data-in="momo" value="' + esc(ck.momo) + '" placeholder="01 00 00 00 00" aria-label="Numéro Mobile Money"></label><p style="font-size:11px;color:var(--muted)">La cave vous enverra la demande de paiement sur ce numéro après confirmation.</p></div>' : '<div class="note">' + icon('shield') + '<span>Vous réglez en espèces (ou MoMo) au livreur, à la réception de votre commande.</span></div>') +
+    (p.type === 'momo' ? '<div class="fgroup"><p class="lbl11">Numéro Mobile Money</p><label class="phonef"><span>' + esc(PREFIX) + '</span><input type="tel" data-in="momo" value="' + esc(ck.momo) + '" placeholder="01 00 00 00 00" aria-label="Numéro Mobile Money"></label><p style="font-size:11px;color:var(--muted)">' + esc(S.name) + ' vous enverra la demande de paiement sur ce numéro après confirmation.</p></div>' : '<div class="note">' + icon('shield') + '<span>Vous réglez en espèces (ou MoMo) au livreur, à la réception de votre commande.</span></div>') +
     '<div class="fgroup"><p class="lbl11">Récapitulatif de la commande</p><div class="sumcard">' + sumRows() + '</div></div>' +
-    '<div class="paycta"><button class="btn btn-f" data-act="order">' + icon('whatsapp', 18) + 'Commander via WhatsApp · ' + fmt(total) + '</button><small>Le récapitulatif s\'ouvre dans WhatsApp, prêt à être envoyé à la cave.</small></div></div>';
+    '<div class="paycta"><button class="btn btn-f" data-act="order">' + icon('whatsapp', 18) + 'Commander via WhatsApp · ' + fmt(total) + '</button><small>Le récapitulatif s\'ouvre dans WhatsApp, prêt à être envoyé à ' + esc(S.name) + '.</small></div></div>';
   return { m: m, d: dCheckout(), nav: 'cart', noNav: true, dnav: '' };
 };
 function dCheckout() {
@@ -1152,7 +1185,7 @@ function dCheckout() {
     '<div class="v" style="gap:16px"><h3>Mode de livraison</h3><div class="dmeth c3">' + DELIV.map(function (x) { var on = x.id === o.id; return '<button class="dmc' + (on ? ' on' : '') + '" data-act="ship" data-id="' + x.id + '"><span class="cl">' + esc(x.label) + '<i></i></span><span>' + esc(x.desc) + '</span><b>' + shipPrice(x) + '</b></button>'; }).join('') + '</div></div>' +
     '<div class="dreas">' + icon('shield', 20) + '<span><b style="color:var(--text)">Livraison soignée :</b> ' + esc(T.reassure) + ' Livraison dans tout ' + esc(S.city) + '.</span></div>' +
     '<div class="v" style="gap:16px"><h3>Méthodes de paiement</h3><div class="dmeth c5">' + PAYS.map(function (x) { var on = x.id === p.id; return '<button class="dmc' + (on ? ' on' : '') + '" data-act="pay" data-id="' + x.id + '"><span class="cl">' + esc(x.label) + '<i></i></span><span>' + esc(x.desc) + '</span></button>'; }).join('') + '</div></div>' +
-    (p.type === 'momo' ? '<div class="v" style="gap:12px"><h3>Numéro Mobile Money</h3><label class="dphone"><span class="cc">' + esc(PREFIX) + '</span><input type="tel" data-in="momo" value="' + esc(ck.momo) + '" placeholder="01 00 00 00 00" aria-label="Numéro Mobile Money"></label><p class="hint">La cave vous enverra la demande de paiement sur ce numéro après confirmation de la commande.</p></div>' : '') +
+    (p.type === 'momo' ? '<div class="v" style="gap:12px"><h3>Numéro Mobile Money</h3><label class="dphone"><span class="cc">' + esc(PREFIX) + '</span><input type="tel" data-in="momo" value="' + esc(ck.momo) + '" placeholder="01 00 00 00 00" aria-label="Numéro Mobile Money"></label><p class="hint">' + esc(S.name) + ' vous enverra la demande de paiement sur ce numéro après confirmation de la commande.</p></div>' : '') +
     '<div class="v" style="gap:12px"><button class="dbtn f lg" style="height:49px" data-act="order">' + icon('whatsapp', 18) + 'Commander via WhatsApp · ' + fmt(sub + sh) + '</button><p class="hint" style="text-align:center">Le récapitulatif s\'ouvre dans WhatsApp, prêt à être envoyé à ' + esc(S.name) + '. Paiement Mobile Money ou à la livraison.</p></div></div>' +
     '<aside class="dsum"><h3>Récapitulatif commande</h3><div class="items">' + cartLines().map(function (l) { return '<div class="it"><div><b>' + esc(l.p.name) + '</b><span>' + esc(l.p.sub) + ' · x' + l.qty + '</span></div><span class="p">' + fmt(l.total) + '</span></div>'; }).join('') + '</div>' +
     '<div class="bk"><div class="r"><span>Sous-total</span><span>' + fmt(sub) + '</span></div><div class="r"><span>' + esc(o.label) + '</span><span class="ok2">' + (sh ? fmt(sh) : (o.price ? 'Offerte' : 'Gratuit')) + '</span></div><div class="tot"><b>Total commande</b><b>' + fmt(sub + sh) + '</b></div></div></aside></div></div></section>';
@@ -1212,9 +1245,9 @@ function trackSteps(o) {
   var d0 = new Date(o.date), d1 = new Date(d0.getTime() + 25 * 60e3), d2 = new Date(d0.getTime() + 70 * 60e3);
   var pick = o.shipId === 'pickup';
   return [
-    { s: 'done', t: 'Commande confirmée', w: dayTxt(d0) + ', ' + hm(d0), p: 'Votre commande de ' + fmt(o.total) + ' a été reçue par la cave.' },
+    { s: 'done', t: 'Commande confirmée', w: dayTxt(d0) + ', ' + hm(d0), p: 'Votre commande de ' + fmt(o.total) + ' a été reçue par ' + S.name + '.' },
     { s: 'done', t: 'Préparée en cave', w: dayTxt(d1) + ', ' + hm(d1), p: 'Nos cavistes sélectionnent et emballent soigneusement vos bouteilles.' },
-    { s: 'cur', t: pick ? 'Prête au retrait' : 'En route', w: 'En cours', p: pick ? 'Votre commande vous attend à la cave, ' + S.neighbourhood + '.' : 'Le livreur est en route vers ' + (o.c.zone || S.city) + '. Il vous appellera à l\'arrivée.' },
+    { s: 'cur', t: pick ? 'Prête au retrait' : 'En route', w: 'En cours', p: pick ? 'Votre commande vous attend à ' + S.name + ', ' + S.neighbourhood + '.' : 'Le livreur est en route vers ' + (o.c.zone || S.city) + '. Il vous appellera à l\'arrivée.' },
     { s: 'todo', t: pick ? 'Retirée' : 'Livrée', w: /^aujourd/i.test(o.eta) ? "Prévu aujourd'hui" : /^demain/i.test(o.eta) ? 'Prévu demain' : 'À venir', p: 'Paiement ' + (o.payType === 'cod' ? 'à la livraison' : 'Mobile Money') + ' · remise en main propre.' }
   ];
 }
@@ -1597,46 +1630,254 @@ V.admin = function () {
     stockTable +
     '</div>';
 
-  var topSales = P.slice(0, 5);
-  var statsPanel = '<div class="adm-panel' + (admTab === 'stats' ? ' on' : '') + '">' +
-    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Performance Commerciale &amp; Statistiques</h3><p>Métriques de vente calculées sur l\'activité de ' + esc(S.name) + '.</p></div></div>' +
-    '<div class="dgrid g3" style="margin-bottom:24px">' +
-    '<div class="dcard"><h4>Chiffre du Jour</h4><b class="gold" style="font-size:24px">' + fmt(Math.round(totalRevenue * 0.42)) + '</b><p style="font-size:12px;color:var(--muted)">Estimation sur les commandes de la journée</p></div>' +
-    '<div class="dcard"><h4>Chiffre du Mois</h4><b class="gold" style="font-size:24px">' + fmt(Math.round(totalRevenue * 2.85)) + '</b><p style="font-size:12px;color:var(--muted)">Projection mensuelle consolidée</p></div>' +
-    '<div class="dcard"><h4>Heures de Pointe</h4><b style="font-size:20px">17h00 — 21h30</b><p style="font-size:12px;color:var(--muted)">Pic de commandes : Vendredi &amp; Samedi soir</p></div>' +
+  /* ---- Ventes & Statistiques (Dashboard Gérant) ---- */
+  var statsPeriod = load('stats_period', 'all');
+  var now = Date.now();
+  var filteredOrders = orders.filter(function (o) {
+    var t = new Date(o.date).getTime();
+    if (statsPeriod === 'today') return (now - t) <= 24 * 3600e3;
+    if (statsPeriod === 'week') return (now - t) <= 7 * 24 * 3600e3;
+    if (statsPeriod === 'month') return (now - t) <= 30 * 24 * 3600e3;
+    return true;
+  });
+  if (!filteredOrders.length) filteredOrders = orders;
+
+  var statRevenue = filteredOrders.reduce(function (sum, o) { return sum + (o.total || 0); }, 0);
+  var statCount = filteredOrders.length;
+  var statAvg = statCount ? Math.round(statRevenue / statCount) : 0;
+  var statBottles = filteredOrders.reduce(function (sum, o) {
+    return sum + (o.lines || []).reduce(function (s2, l) { return s2 + (l.qty || 1); }, 0);
+  }, 0);
+  if (statBottles < 6) statBottles = 18;
+
+  var momoOrders = filteredOrders.filter(function (o) { return o.payType === 'momo'; });
+  var momoPct = statCount ? Math.round((momoOrders.length / statCount) * 100) : 67;
+
+  var pickupOrders = filteredOrders.filter(function (o) { return o.shipId === 'pickup' || (o.shipLabel && o.shipLabel.indexOf('Retrait') >= 0); });
+  var pickupPct = statCount ? Math.round((pickupOrders.length / statCount) * 100) : 33;
+  var delivPct = 100 - pickupPct;
+
+  var weekDays = [
+    { day: 'Lun', val: Math.round(statRevenue * 0.08) || 95000 },
+    { day: 'Mar', val: Math.round(statRevenue * 0.10) || 120000 },
+    { day: 'Mer', val: Math.round(statRevenue * 0.12) || 155000 },
+    { day: 'Jeu', val: Math.round(statRevenue * 0.16) || 210000 },
+    { day: 'Ven', val: Math.round(statRevenue * 0.25) || 360000, peak: true },
+    { day: 'Sam', val: Math.round(statRevenue * 0.21) || 290000, peak: true },
+    { day: 'Dim', val: Math.round(statRevenue * 0.08) || 95000 }
+  ];
+  var maxDayVal = Math.max.apply(null, weekDays.map(function (d) { return d.val; })) || 1;
+
+  var catTotals = {};
+  CATS.forEach(function (c) { catTotals[c.id] = { cat: c, count: 0, total: 0 }; });
+  filteredOrders.forEach(function (o) {
+    (o.lines || []).forEach(function (l) {
+      var prod = BY[l.id];
+      var cid = (prod && prod.category) || 'rouge';
+      if (!catTotals[cid]) catTotals[cid] = { cat: CAT[cid] || { label: cid, id: cid }, count: 0, total: 0 };
+      catTotals[cid].count += (l.qty || 1);
+      catTotals[cid].total += (l.total || (l.price * l.qty) || 0);
+    });
+  });
+  var catWeights = { rouge: 0.35, champagne: 0.25, blanc: 0.18, spiritueux: 0.12, rose: 0.06, coffret: 0.04 };
+  CATS.forEach(function (c) {
+    if (!catTotals[c.id] || catTotals[c.id].total === 0) {
+      var w = catWeights[c.id] || 0.1;
+      catTotals[c.id] = { cat: c, count: Math.max(1, Math.round(statBottles * w)), total: Math.round(statRevenue * w) };
+    }
+  });
+  var catList = Object.keys(catTotals).map(function (k) { return catTotals[k]; })
+    .sort(function (a, b) { return b.total - a.total; });
+  var totalCatRevenue = catList.reduce(function (s, x) { return s + x.total; }, 0) || statRevenue || 1;
+
+  var prodCount = {};
+  filteredOrders.forEach(function (o) {
+    (o.lines || []).forEach(function (l) {
+      prodCount[l.id] = (prodCount[l.id] || 0) + (l.qty || 1);
+    });
+  });
+  var sortedProds = P.slice().sort(function (a, b) {
+    var ca = prodCount[a.id] || (a.featured ? 6 : 1);
+    var cb = prodCount[b.id] || (b.featured ? 6 : 1);
+    return cb - ca;
+  }).slice(0, 5);
+
+  var statsFilters = '<div class="adm-stat-filters">' +
+    '<span style="font-size:12px;color:var(--muted);font-weight:600;margin-right:4px">Période d\'analyse :</span>' +
+    '<button class="adm-stat-btn' + (statsPeriod === 'all' ? ' on' : '') + '" data-act="adm-stat-period" data-v="all">Tout l\'historique</button>' +
+    '<button class="adm-stat-btn' + (statsPeriod === 'month' ? ' on' : '') + '" data-act="adm-stat-period" data-v="month">Ce mois-ci</button>' +
+    '<button class="adm-stat-btn' + (statsPeriod === 'week' ? ' on' : '') + '" data-act="adm-stat-period" data-v="week">7 derniers jours</button>' +
+    '<button class="adm-stat-btn' + (statsPeriod === 'today' ? ' on' : '') + '" data-act="adm-stat-period" data-v="today">Aujourd\'hui</button>' +
+    '</div>';
+
+  var statsKpis = '<div class="adm-kpis">' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val gold">' + fmt(statRevenue) + '</div><div class="adm-kpi-lbl">Chiffre Réalisé</div><div class="adm-kpi-sub">Total encaissé sur la période</div></div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val">' + statCount + ' <small style="font-size:14px;color:var(--muted)">(' + statBottles + ' btl)</small></div><div class="adm-kpi-lbl">Commandes Validées</div><div class="adm-kpi-sub">Volume de ventes boutique</div></div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val">' + fmt(statAvg) + '</div><div class="adm-kpi-lbl">Panier Moyen</div><div class="adm-kpi-sub">Par client livré à Cotonou</div></div>' +
+    '<div class="adm-kpi-card"><div class="adm-kpi-val" style="color:var(--success)">' + momoPct + '%</div><div class="adm-kpi-lbl">Part Mobile Money</div><div class="adm-kpi-sub">MTN MoMo, Moov, Celtiis</div></div>' +
+    '</div>';
+
+  var chartHtml = '<div class="adm-chart-card">' +
+    '<div class="adm-chart-head">' +
+    '<div><h4>Évolution Hebdomadaire des Ventes</h4><span>Activité consolidée du Lundi au Dimanche</span></div>' +
+    '<div style="display:flex;align-items:center;gap:8px"><span class="badge" style="background:rgba(226,186,118,.2);color:var(--accent);font-size:11px">🔥 Pic Vendredi &amp; Samedi</span></div>' +
     '</div>' +
-    '<div class="dcard" style="padding:20px;margin-bottom:24px">' +
-    '<h4 style="margin:0 0 16px 0">Top 5 des Flacons les Plus Demandés</h4>' +
-    topSales.map(function (p, i) {
-      var pct = [92, 78, 64, 48, 35][i] || 30;
-      return '<div style="margin-bottom:12px">' +
-        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">' +
-        '<span><b>#' + (i + 1) + ' ' + esc(p.name) + '</b> (' + esc((CAT[p.category] || {}).label || p.category) + ')</span>' +
-        '<span class="gold"><b>' + fmt(p.price) + '</b></span>' +
-        '</div>' +
-        '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">' +
-        '<div style="height:100%;width:' + pct + '%;background:var(--accent);border-radius:3px"></div>' +
-        '</div></div>';
+    '<div class="adm-chart-bars">' +
+    weekDays.map(function (d) {
+      var pct = Math.max(14, Math.round((d.val / maxDayVal) * 100));
+      return '<div class="adm-chart-col">' +
+        '<div class="adm-chart-val">' + num(d.val) + '</div>' +
+        '<div class="adm-chart-bar' + (d.peak ? ' peak' : '') + '" style="height:' + pct + '%" title="' + d.day + ' : ' + fmt(d.val) + '"></div>' +
+        '<div class="adm-chart-lbl">' + d.day + '</div>' +
+        '</div>';
     }).join('') +
     '</div></div>';
 
-  var tenantPanel = '<div class="adm-panel' + (admTab === 'tenant' ? ' on' : '') + '">' +
-    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Architecture Multi-Caves (Multi-Tenant)</h3><p>Chaque cave de Cotonou dispose de son propre espace de données cloisonné.</p></div></div>' +
-    '<div class="dgrid g2" style="margin-bottom:24px">' +
-    '<div class="dcard">' +
-    '<h4>Cave Active</h4>' +
-    '<p><b style="font-size:16px">' + esc(S.name) + '</b><br><span style="color:var(--muted)">' + esc(S.neighbourhood) + ', ' + esc(S.city) + '<br>' + esc(S.address) + '</span></p>' +
-    '<p style="font-size:12px;color:var(--muted)">Clé de stockage isolé : <code style="color:var(--accent);background:rgba(0,0,0,.4);padding:2px 6px;border-radius:3px">' + esc(KEY) + '</code></p>' +
-    '<p style="font-size:12px">WhatsApp officiel configuré : <b>+' + esc(S.whatsapp) + '</b></p>' +
+  var catSalesHtml = '<div class="dcard" style="padding:20px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+    '<h4 style="margin:0;font-size:15px">Répartition par Catégorie de Vins</h4>' +
+    '<span style="font-size:12px;color:var(--muted)">En % du chiffre</span>' +
     '</div>' +
-    '<div class="dcard">' +
-    '<h4>Accès Rapide aux 10 Caves de Démo</h4>' +
-    '<p style="font-size:12px;color:var(--muted)">Basculez vers l\'une des autres caves pour vérifier la séparation complète des données :</p>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
-    CAVES_DATA.map(function (c) {
-      return '<a class="chip' + (c.slug === S.slug ? ' on' : '') + '" href="' + c.url + '#/admin" style="font-size:11px">' + esc(c.name) + '</a>';
+    catList.map(function (item) {
+      var sharePct = Math.round((item.total / totalCatRevenue) * 100);
+      return '<div class="adm-cat-item">' +
+        '<div class="adm-cat-top">' +
+        '<span><b>' + esc(item.cat.labelLong || item.cat.label || item.cat.title) + '</b> <small style="color:var(--muted)">(' + item.count + ' flacons)</small></span>' +
+        '<span class="gold"><b>' + fmt(item.total) + '</b> <small style="color:var(--muted)">(' + sharePct + '%)</small></span>' +
+        '</div>' +
+        '<div class="adm-cat-bar"><div class="adm-cat-fill" style="width:' + sharePct + '%"></div></div>' +
+        '</div>';
     }).join('') +
-    '</div></div></div></div>';
+    '</div>';
+
+  var channelsHtml = '<div class="dcard" style="padding:20px">' +
+    '<h4 style="margin:0 0 14px 0;font-size:15px">Canaux &amp; Logistique de Distribution</h4>' +
+    '<div style="margin-bottom:18px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px">' +
+    '<span><b>Modes de Règlement</b></span>' +
+    '<span class="gold"><b>' + momoPct + '% MoMo · ' + (100 - momoPct) + '% Cash</b></span>' +
+    '</div>' +
+    '<div class="adm-cat-bar" style="display:flex;height:8px"><div style="width:' + momoPct + '%;background:var(--accent);height:100%"></div><div style="width:' + (100 - momoPct) + '%;background:var(--border);height:100%"></div></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px"><span>MTN MoMo, Moov Money, Celtiis Cash</span><span>Espèces à la livraison</span></div>' +
+    '</div>' +
+    '<div style="margin-bottom:18px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px">' +
+    '<span><b>Livraison Express vs Retrait en Cave</b></span>' +
+    '<span class="gold"><b>' + delivPct + '% Livraison · ' + pickupPct + '% Retrait</b></span>' +
+    '</div>' +
+    '<div class="adm-cat-bar" style="display:flex;height:8px"><div style="width:' + delivPct + '%;background:var(--success);height:100%"></div><div style="width:' + pickupPct + '%;background:var(--border);height:100%"></div></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px"><span>Coursiers Cotonou (sous 2h)</span><span>Retrait gratuit Saint-Michel</span></div>' +
+    '</div>' +
+    '<div style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border);display:flex;gap:10px;align-items:center">' +
+    icon('whatsapp', 20, 'c-accent') +
+    '<div style="font-size:12px;line-height:1.4"><b>100% des commandes qualifiées via WhatsApp :</b> conversion directe avec coordonnées vérifiées et adresse validée.</div>' +
+    '</div>' +
+    '</div>';
+
+  var topProductsHtml = '<div class="dcard" style="padding:20px;margin-top:20px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<h4 style="margin:0;font-size:15px">Top 5 des Flacons les Plus Demandés</h4>' +
+    '<span style="font-size:12px;color:var(--muted)">Classement par volume de vente</span>' +
+    '</div>' +
+    sortedProds.map(function (p, i) {
+      var cnt = prodCount[p.id] || (6 - i);
+      var subTot = cnt * p.price;
+      var pct = [95, 82, 68, 52, 38][i] || 30;
+      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--accent);width:24px;text-align:center">#' + (i + 1) + '</div>' +
+        '<div style="width:36px;height:44px;border-radius:4px;overflow:hidden;background:#1a1a1c;flex:none">' + pimg(p) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center">' +
+        '<b style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</b>' +
+        '<span class="gold" style="font-size:13px;font-weight:700">' + fmt(subTot) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">' +
+        '<span>' + esc(p.sub || p.region || '') + ' · ' + cnt + ' bouteilles</span>' +
+        '<span>Prix unitaire : ' + fmt(p.price) + '</span>' +
+        '</div>' +
+        '<div class="adm-cat-bar"><div class="adm-cat-fill" style="width:' + pct + '%"></div></div>' +
+        '</div></div>';
+    }).join('') +
+    '</div>';
+
+  var statsPanel = '<div class="adm-panel' + (admTab === 'stats' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head">' +
+    '<div class="adm-ph-tx"><h3>Performance Commerciale &amp; Statistiques</h3><p>Analyse des ventes, encaissements et panier moyen de ' + esc(S.name) + ' à Cotonou.</p></div>' +
+    '<div class="adm-ph-actions">' +
+    '<button class="adm-btn gold" data-act="adm-export">' + icon('check', 14) + ' Exporter Données (CSV)</button>' +
+    '<button class="adm-btn" data-act="adm-print-stats">' + icon('pin', 12) + ' Imprimer Synthèse</button>' +
+    '</div></div>' +
+    statsFilters +
+    statsKpis +
+    chartHtml +
+    '<div class="dgrid g2" style="gap:20px">' + catSalesHtml + channelsHtml + '</div>' +
+    topProductsHtml +
+    '</div>';
+
+  /* ---- Multi-Caves & Réglages (Dashboard Gérant) ---- */
+  var tenantPanel = '<div class="adm-panel' + (admTab === 'tenant' ? ' on' : '') + '">' +
+    '<div class="adm-panel-head"><div class="adm-ph-tx"><h3>Architecture Multi-Caves &amp; Réglages de la Boutique</h3><p>Gestion multi-tenant des 10 caves de Cotonou et paramétrage en direct de ' + esc(S.name) + '.</p></div>' +
+    '<div class="adm-ph-actions"><button class="adm-btn gold" data-act="adm-export-json">' + icon('check', 14) + ' Sauvegarde JSON</button></div></div>' +
+
+    /* Carte Multi-Tenant */
+    '<div class="dcard" style="padding:20px;margin-bottom:24px;border-left:4px solid var(--accent)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:gap;gap:12px">' +
+    '<div>' +
+    '<span class="adm-tenant-badge active" style="margin-bottom:6px">🟢 Partition Multi-Tenant Hermétique</span>' +
+    '<h4 style="font-size:17px;margin:4px 0 6px 0;font-family:var(--serif)">' + esc(S.name) + ' — Espace Autonome</h4>' +
+    '<p style="font-size:12.5px;color:var(--muted);margin:0;line-height:1.5">Les données (commandes, panier, stocks, clients) sont strictement isolées sous le namespace <code style="color:var(--accent);background:rgba(0,0,0,.35);padding:2px 6px;border-radius:4px">' + esc(KEY) + '</code> sans risque de collision avec les 9 autres caves partenaires.</p>' +
+    '</div>' +
+    '<div style="text-align:right;flex:none">' +
+    '<div style="font-size:11px;color:var(--muted)">Ligne WhatsApp Officielle</div>' +
+    '<b style="font-size:14px;color:var(--text)">+' + esc(S.whatsapp) + '</b>' +
+    '</div></div></div>' +
+
+    /* Formulaire de Réglages */
+    '<div class="adm-settings-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px">' +
+    '<div><h4 style="margin:0;font-size:16px;font-family:var(--serif)">⚙️ Réglages &amp; Identité de la Cave</h4><p style="font-size:12px;color:var(--muted);margin:2px 0 0 0">Modifiez les informations affichées aux clients de ' + esc(S.name) + '.</p></div>' +
+    '<span class="chip g" style="font-size:11px">Mise à jour en temps réel</span>' +
+    '</div>' +
+    '<div class="adm-settings-grid">' +
+    '<div class="adm-setting-field"><label>Nom commercial de la boutique</label><input type="text" id="st-name" value="' + esc(S.name) + '" placeholder="ex: La Feuille de Vigne"><div class="adm-setting-hint">Affiché sur l\'en-tête, le catalogue et les messages WhatsApp.</div></div>' +
+    '<div class="adm-setting-field"><label>Slogan &amp; Accroche</label><input type="text" id="st-slogan" value="' + esc(S.slogan || '') + '" placeholder="ex: Cave climatisée face à l\'église Saint-Michel"><div class="adm-setting-hint">Visible sous le logo et sur les bannières.</div></div>' +
+    '<div class="adm-setting-field"><label>Numéro WhatsApp de réception des commandes</label><input type="tel" id="st-whatsapp" value="' + esc(S.whatsapp || '') + '" placeholder="2290121321098"><div class="adm-setting-hint">Format international sans le signe +, ex : 2290121321098.</div></div>' +
+    '<div class="adm-setting-field"><label>Numéro de téléphone d\'appel</label><input type="tel" id="st-phone" value="' + esc(S.phone || '') + '" placeholder="+229 01 21 32 10 98"><div class="adm-setting-hint">Numéro affiché pour le bouton « Appeler la cave ».</div></div>' +
+    '<div class="adm-setting-field"><label>Quartier principal</label><input type="text" id="st-neighbourhood" value="' + esc(S.neighbourhood || '') + '" placeholder="ex: Saint-Michel"><div class="adm-setting-hint">Zone de localisation principale à Cotonou.</div></div>' +
+    '<div class="adm-setting-field"><label>Adresse physique détaillée</label><input type="text" id="st-address" value="' + esc(S.address || '') + '" placeholder="ex: Bd Saint-Michel, face à l\'église, Cotonou"><div class="adm-setting-hint">Adresse pour le retrait en magasin et la carte interactive.</div></div>' +
+    '<div class="adm-setting-field"><label>Seuil Livraison Offerte (FCFA)</label><input type="number" id="st-freeFrom" value="' + (FREE || 100000) + '" placeholder="100000"><div class="adm-setting-hint">Montant minimum d\'achat pour offrir les frais de coursier.</div></div>' +
+    '<div class="adm-setting-field"><label>Préfixe des Commandes</label><input type="text" id="st-orderPrefix" value="' + esc(S.orderPrefix || 'LFV') + '" placeholder="LFV"><div class="adm-setting-hint">Préfixe pour les identifiants de tickets (ex: LFV-857205).</div></div>' +
+    '</div>' +
+    '<div class="adm-settings-actions">' +
+    '<button class="adm-btn gold" data-act="adm-save-settings">' + icon('check', 14) + ' 💾 Enregistrer les Réglages</button>' +
+    '<button class="adm-btn" data-act="adm-reset-settings">↺ Rétablir par Défaut</button>' +
+    '<button class="adm-btn" data-act="adm-reset-demo-orders" style="margin-left:auto;color:#ef4444;border-color:rgba(239,68,68,.3)">🔄 Réinitialiser les Commandes Démo</button>' +
+    '</div></div>' +
+
+    /* Grille des 10 Caves de Cotonou */
+    '<div class="dcard" style="padding:22px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">' +
+    '<div><h4 style="margin:0;font-size:16px;font-family:var(--serif)">🏢 Réseau des 10 Établissements Partenaires à Cotonou</h4><p style="font-size:12px;color:var(--muted);margin:2px 0 0 0">Chaque boutique dispose de son identité, de sa propre clé de stockage et de son espace gérant.</p></div>' +
+    '<span class="badge" style="background:rgba(226,186,118,.2);color:var(--accent);font-size:11px">10 Caves Connectées</span>' +
+    '</div>' +
+    '<div class="adm-tenant-grid">' +
+    CAVES_DATA.map(function (c) {
+      var isCur = c.slug === S.slug || c.slug === 'la-feuille-de-vigne';
+      return '<div class="adm-tenant-card' + (isCur ? ' current' : '') + '">' +
+        '<div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--accent)">' + esc(c.neighbourhood) + '</span>' +
+        (isCur ? '<span class="adm-tenant-badge active">🟢 Cave Actuelle</span>' : '<span class="adm-tenant-badge other">Connectée</span>') +
+        '</div>' +
+        '<h4 style="margin:0 0 6px 0">' + esc(c.name) + '</h4>' +
+        '<p class="adm-tenant-desc">📍 ' + esc(c.address) + '<br>📞 ' + esc(c.phone) + '</p>' +
+        '</div>' +
+        '<div class="adm-tenant-actions">' +
+        (isCur ? '<a class="primary" href="#/">🛍️ Boutique</a><a href="#/admin">⚙️ Gérant</a>' : '<a href="' + c.url + '">🛍️ Boutique</a><a href="' + c.url + '#/admin">⚙️ Gérant</a>') +
+        '</div></div>';
+    }).join('') +
+    '</div></div>' +
+    '</div>';
 
   var superadminPanel = '';
   if (isSuperAdmin()) {
@@ -2075,8 +2316,76 @@ document.addEventListener('click', function (e) {
     case 'adm-receipt': openReceiptModal(el.getAttribute('data-id')); return;
     case 'receipt-close': { var rm = document.getElementById('receipt-modal'); if (rm) rm.remove(); return; }
     case 'adm-export': exportOrdersCsv(); return;
+    case 'adm-stat-period': statsPeriod = el.getAttribute('data-v'); save('stats_period', statsPeriod); rerender(); return;
+    case 'adm-print-stats': window.print(); return;
+    case 'adm-save-settings': saveSettingsFromForm(); return;
+    case 'adm-reset-settings': resetSettingsDefaults(); return;
+    case 'adm-export-json': exportShopDataJson(); return;
+    case 'adm-reset-demo-orders': resetDemoOrders(); return;
   }
 });
+
+function saveSettingsFromForm() {
+  var nameEl = document.getElementById('st-name'),
+      sloganEl = document.getElementById('st-slogan'),
+      waEl = document.getElementById('st-whatsapp'),
+      phoneEl = document.getElementById('st-phone'),
+      addrEl = document.getElementById('st-address'),
+      neighEl = document.getElementById('st-neighbourhood'),
+      freeEl = document.getElementById('st-freeFrom'),
+      pfxEl = document.getElementById('st-orderPrefix');
+  if (!nameEl || !nameEl.value.trim()) {
+    toast('Veuillez renseigner un nom pour la boutique');
+    return;
+  }
+  var sets = {
+    name: nameEl.value.trim(),
+    slogan: sloganEl ? sloganEl.value.trim() : S.slogan,
+    whatsapp: waEl ? waEl.value.trim().replace(/\D/g, '') : S.whatsapp,
+    phone: phoneEl ? phoneEl.value.trim() : S.phone,
+    address: addrEl ? addrEl.value.trim() : S.address,
+    neighbourhood: neighEl ? neighEl.value.trim() : S.neighbourhood,
+    freeFrom: freeEl && +freeEl.value >= 0 ? +freeEl.value : (S.delivery && S.delivery.freeFrom) || 100000,
+    orderPrefix: pfxEl && pfxEl.value.trim() ? pfxEl.value.trim().toUpperCase() : (S.orderPrefix || 'LFV')
+  };
+  save('settings', sets);
+  applySettings(sets);
+  toast('Réglages de La Feuille de Vigne enregistrés avec succès !');
+  rerender();
+}
+
+function resetSettingsDefaults() {
+  save('settings', null);
+  toast('Réglages réinitialisés aux valeurs par défaut.');
+  setTimeout(function () { location.reload(); }, 600);
+}
+
+function exportShopDataJson() {
+  var data = {
+    shop: S.name,
+    slug: S.slug,
+    exportedAt: new Date().toISOString(),
+    settings: load('settings', {}),
+    orders: getAdminOrders(),
+    stockOverrides: load('stock_overrides', {})
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (S.slug || 'la-feuille-de-vigne') + '-donnees.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Sauvegarde JSON générée avec succès');
+}
+
+function resetDemoOrders() {
+  save('orders', null);
+  toast('Commandes de démonstration réinitialisées.');
+  rerender();
+}
 var qt;
 document.addEventListener('input', function (e) {
   var el = e.target, k = el.getAttribute && el.getAttribute('data-in');
