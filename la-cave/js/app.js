@@ -940,7 +940,7 @@ V.categorie = function (args) {
   if (catState.region && !rc[catState.region]) catState.region = '';
   var list = sortList(all.filter(function (p) { return !catState.region || p.region === catState.region; }));
   var wine = HUB && c.group === 'vins';
-  var kicker = c.kicker || (wine ? WP.title : 'La cave');
+  var kicker = c.kicker || (wine ? WP.title : 'La Feuille de Vigne');
   var chips = regs.length > 1 ? [['', 'Toutes (' + all.length + ')']].concat(regs.map(function (r) { return [r, r + ' (' + rc[r] + ')']; })) : [];
   var sibs = wine ? WINE.filter(function (w) { return w !== c; }) : [];
   var chipHtml = function (cls) { return chips.map(function (x) { return '<button class="' + cls + (catState.region === x[0] ? ' on' : '') + '" data-act="creg" data-v="' + esc(x[0]) + '">' + esc(x[1]) + '</button>'; }).join(''); };
